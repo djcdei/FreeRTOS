@@ -1,0 +1,6 @@
+-c --cpu Cortex-M4.fp -g -O2 --apcs=interwork --split_sections -I..\CORE -I..\SYSTEM\delay -I..\SYSTEM\sys -I..\SYSTEM\usart -I..\USER -I..\FWLIB\inc -I..\HARDWARE\LED -I..\FREERTOS\include -I..\FREERTOS\port -I..\HARDWARE\DHT11 -I..\HARDWARE\SR04 -I..\HARDWARE\BEEP
+-I D:\STM32Project\FreeRTOS\USER\RTE
+-I D:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\1.0.8\Device\Include
+-I D:\Keil_v5\ARM\CMSIS\Include
+-D__UVISION_VERSION="514" -DSTM32F40_41xxx -DSTM32F40_41xxx -DUSE_STDPERIPH_DRIVER
+-o ..\obj\beep.o --omf_browse ..\obj\beep.crf --depend ..\obj\beep.d "..\HARDWARE\BEEP\beep.c"
