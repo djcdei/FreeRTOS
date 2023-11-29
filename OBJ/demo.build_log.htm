@@ -21,19 +21,50 @@ Target DLL:      Segger\JL2CM3.dll V2.99.13.0
 Dialog DLL:      TCM.DLL V1.14.4.0
  
 <h2>Project:</h2>
-D:\STM32Project\FreeRTOS\USER\FreeRTOS.uvprojx
-Project File Date:  07/20/2021
+d:\STM32Project\FreeRTOS\USER\FreeRTOS.uvprojx
+Project File Date:  11/29/2023
 
 <h2>Output:</h2>
 Build target 'FreeRTOS'
 compiling main.c...
+main.c(286): warning:  #520-D: initialization with "{...}" expected for aggregate object
+        uint8_t buf[16] = 0;
+main.c(286): warning:  #177-D: variable "buf" was declared but never referenced
+        uint8_t buf[16] = 0;
+main.c(287): warning:  #177-D: variable "beep" was declared but never referenced
+        beep_t beep;
+main.c(506): warning:  #177-D: variable "cnt" was declared but never referenced
+        static uint32_t cnt = 0; // 限制记录的温度只有10条
+main.c(883): warning:  #177-D: variable "pass_auth_eeprom" was declared but never referenced
+        char pass_auth_eeprom[PASS_LEN] = {0}; // 存储在e2prom里面的密码
+main.c(17): warning:  #177-D: variable "app_task_mfrc522real_handle" was declared but never referenced
+  static TaskHandle_t app_task_mfrc522real_handle = NULL;
+main.c(18): warning:  #177-D: variable "app_task_mfrc522admin_handle" was declared but never referenced
+  static TaskHandle_t app_task_mfrc522admin_handle = NULL;
+main.c(35): warning:  #177-D: function "app_task_mfrc522real" was declared but never referenced
+  static void app_task_mfrc522real(void *pvParameters);  /*     rfid读卡任务函数*/
+main.c(36): warning:  #177-D: function "app_task_mfrc522admin" was declared but never referenced
+  static void app_task_mfrc522admin(void *pvParameters); /*     rfid管理任务函数*/
+main.c: 9 warnings, 0 errors
+compiling beep.c...
+compiling oled.c...
+compiling key.c...
+compiling rtc.c...
+compiling bmp.c...
+compiling keyboard.c...
+compiling at24c02.c...
+..\HARDWARE\AT24C02\at24c02.c(266): warning:  #1-D: last line of file ends without a newline
+  }
+..\HARDWARE\AT24C02\at24c02.c: 1 warning, 0 errors
+compiling fpm383.c...
+compiling usart.c...
 linking...
-Program Size: Code=8712 RO-data=424 RW-data=172 ZI-data=79276  
+Program Size: Code=32904 RO-data=8828 RW-data=348 ZI-data=79420  
 FromELF: creating hex file...
-"..\OBJ\demo.axf" - 0 Error(s), 0 Warning(s).
+"..\OBJ\demo.axf" - 0 Error(s), 10 Warning(s).
 
 <h2>Collection of Component include folders:</h2>
-  D:\STM32Project\FreeRTOS\USER\RTE
+  d:\STM32Project\FreeRTOS\USER\RTE
   D:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\1.0.8\Device\Include
 
 <h2>Collection of Component Files used:</h2>

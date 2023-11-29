@@ -165,7 +165,7 @@ extern "C" {
 #endif
 
 #ifndef INCLUDE_xTimerPendFunctionCall
-	#define INCLUDE_xTimerPendFunctionCall 0
+	#define INCLUDE_xTimerPendFunctionCall 1
 #endif
 
 #ifndef INCLUDE_xTaskGetSchedulerState
@@ -207,7 +207,7 @@ extern "C" {
 #endif
 
 #ifndef configUSE_COUNTING_SEMAPHORES
-	#define configUSE_COUNTING_SEMAPHORES 0
+	#define configUSE_COUNTING_SEMAPHORES 1
 #endif
 
 #ifndef configUSE_ALTERNATIVE_API

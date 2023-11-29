@@ -1,7 +1,6 @@
 #include "flash.h"
 #include <stdio.h>
 
-
 /*flash初始化（擦除）方便写入数据*/
 void flash_init(void)
 {
@@ -28,15 +27,17 @@ void flash_write(flash_t *flash_write_buf)
 	{
 		FLASH_ProgramWord(0x08010000 + flash_write_buf->offset * sizeof(flash_t) + i * 4, *((uint32_t *)flash_write_buf + i));
 	}
-
 	FLASH_Lock();
 }
 
+// 读取flash数据
 void flash_read(uint32_t num)
 {
-	int i = 0;
+	int32_t i = 0;
+	uint8_t buf[128];
 	volatile uint32_t *p;
 	flash_t flash_read_buf;
+
 	FLASH_Unlock();
 
 	for (i = 0; i < num; i++)
@@ -45,15 +46,40 @@ void flash_read(uint32_t num)
 		p = (volatile uint32_t *)((0x08010000 + i * sizeof(flash_t)));
 		if (*p == 0xffffffff)
 		{
-			printf("%08x\r\n:", *p);
+			printf("空\r\n");
 		}
 		else
 		{
-			my_USART_SendData(USART3, flash_read_buf.g_flash_buf);
+			switch (flash_read_buf.mode)
+			{
+			case MODE_OPEN_LOCK_KEYBOARD:
+				sprintf((char *)buf, "%s", "keyboard unlock");
+				break;
+			case MODE_OPEN_LOCK_BLUE:
+				sprintf((char *)buf, "%s", "bluetooth unlock");
+				break;
+			case MODE_OPEN_LOCK_DHT:
+				sprintf((char *)buf, "%s:%s", "dht data", flash_read_buf.databuf);
+				break;
+			case MODE_OPEN_LOCK_RFID:
+				sprintf((char *)buf, "%s", "rfid unlock");
+				break;
+			case MODE_OPEN_LOCK_SFM:
+				sprintf((char *)buf, "%s", "sfm unlock");
+				break;
+			default:
+				break;
+			}
+			printf("20%02x/%02x/%02x %02x:%02x:%02x %s\n",
+				   flash_read_buf.date[0],
+				   flash_read_buf.date[1],
+				   flash_read_buf.date[2],
+				   flash_read_buf.date[3],
+				   flash_read_buf.date[4],
+				   flash_read_buf.date[5],
+				   buf);
 		}
-			
 	}
-
 	FLASH_Lock();
 }
 
@@ -71,5 +97,3 @@ uint32_t flash_read_offset(uint32_t *start_addr)
 	FLASH_Lock();
 	return count; // 返回当前数据块
 }
-
-

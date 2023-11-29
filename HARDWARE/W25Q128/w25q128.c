@@ -1,10 +1,9 @@
 #include "w25q128.h"
 
-static GPIO_InitTypeDef GPIO_InitStructure;
-
 /*模拟SPI flash（W25Q128）初始化*/
 void w25qxx_simulate_init(void)
 {
+	GPIO_InitTypeDef GPIO_InitStructure;
 	// 使能硬件PB4(看原理图)时钟
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 	// 配置PB3( /CS ),PB5(MOSI),PB14
@@ -188,11 +187,11 @@ void w25qxx_sector_erase(uint32_t sector_addr) // 选择扇区地址
 		delay_us(1);
 	}
 
-	w25qxx_write_disable();
+	w25qxx_write_disable(); // 开启写保护
 }
 
-// spi flash页编程(page program)参数：扇区首地址、数据首地址、数据长度
-void w25qxx_page_program(uint32_t page_addr, uint8_t *buf, uint32_t len)
+// spi flash页写入(page program)参数：扇区首地址、数据首地址、数据长度
+void w25qxx_write_page(uint32_t page_addr, uint8_t *buf, uint32_t len)
 {
 	uint8_t sta;
 	uint8_t *p = buf;
@@ -253,3 +252,21 @@ void w25qxx_read_data(uint32_t addr, uint8_t *buf, uint32_t len)
 	// CS引脚为高电平，从机停止工作
 	W25Q128_CS = 1;
 }
+/*正确写入大于一页的数据：w25q128一页256个字节*/
+void w25qxx_write_data(uint32_t addr, uint8_t *pbuf, uint32_t len)
+{
+	while (len > 0)
+	{
+		uint16_t page_remain = 256 - addr % 256; // 计算当前起始地址页中剩余的空间
+		uint16_t write_len = (len < page_remain) ? len : page_remain;
+
+		w25qxx_write_page(addr, pbuf, write_len);
+
+		pbuf += write_len; // 数据缓冲区偏移
+		addr += write_len; // 地址偏移已经写入的字节数
+		len -= write_len;  // 总字节数减少已经写入的字节数
+	}
+}
+
+/*查询spi flash中对应卡号的位置*/
+

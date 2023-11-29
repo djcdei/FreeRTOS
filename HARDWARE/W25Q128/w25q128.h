@@ -12,7 +12,8 @@ extern void w25qxx_read_id(uint8_t *m_id, uint8_t *d_id);
 extern void w25qxx_write_enable(void);
 extern void w25qxx_write_disable(void);
 extern uint8_t read_status_register(void);
-extern void w25qxx_sector_erase(uint32_t sector_addr) ;// 选择扇区地址
-extern void w25qxx_page_program(uint32_t page_addr, uint8_t *buf, uint32_t len);
+extern void w25qxx_sector_erase(uint32_t sector_addr) ;// 扇区擦除
+extern void w25qxx_write_page(uint32_t page_addr, uint8_t *buf, uint32_t len);
 extern void w25qxx_read_data(uint32_t addr, uint8_t *buf, uint32_t len);
+extern void w25qxx_write_data(uint32_t addr, uint8_t *pbuf, uint32_t len);
 #endif

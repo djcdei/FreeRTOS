@@ -36,8 +36,7 @@ int sr04_get_distance(void)
 	delay_us(10); // 延时10us之后使得PB6电平变为低电平
 	PBout(6) = 0;
 	// 等待回响信号变为高电平
-	while (PEin(6) == 0)
-		;
+	while (PEin(6) == 0);
 
 	while (PEin(6) == 1) // 检测回响电平持续时间，通过计算转换为距离
 	{
@@ -45,12 +44,12 @@ int sr04_get_distance(void)
 		delay_us(9);
 	}
 	distance = (double)(3 * cnt / 2);
-	if (distance >= 20 && distance <= 1000)
+	if (distance >= 20 && distance <= 200)
 	{
 		printf("distance = %.3lfmm \r\n", distance);
 		save = 3; // 危险等级3
 	}
-	else if (distance > 1000 && distance <= 2000)
+	else if (distance > 200 && distance <= 2000)
 	{
 		printf("distance = %.3lfmm \r\n", distance);
 		save = 2; // 危险等级2

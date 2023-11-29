@@ -38,6 +38,7 @@ void delay_us(uint32_t nus)
 	xTaskResumeAll();
 }  
 
+/*要注意，任何硬件初始化代码调用了这个ms延时函数的，要在操作系统启动后再初始化*/
 void delay_ms(uint32_t nms)
 {	
    	vTaskDelay(nms);	 						   	

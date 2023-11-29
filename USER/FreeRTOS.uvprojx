@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40_41xxx,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\HARDWARE\LED;..\FREERTOS\include;..\FREERTOS\port;..\HARDWARE\DHT11;..\HARDWARE\SR04;..\HARDWARE\BEEP</IncludePath>
+              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\HARDWARE\LED;..\FREERTOS\include;..\FREERTOS\port;..\HARDWARE\DHT11;..\HARDWARE\SR04;..\HARDWARE\BEEP;..\HARDWARE\FLASH;..\HARDWARE\KEY;..\HARDWARE\RTC;..\HARDWARE\OLED;..\HARDWARE\MFRC522;..\HARDWARE\KEYBOARD;..\HARDWARE\AT24C02;..\HARDWARE\FPM383</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -444,11 +444,6 @@
               <FilePath>..\HARDWARE\DHT11\dht11.c</FilePath>
             </File>
             <File>
-              <FileName>flash.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\FLASH\flash.c</FilePath>
-            </File>
-            <File>
               <FileName>MFRC522.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\MFRC522\MFRC522.c</FilePath>
@@ -467,6 +462,41 @@
               <FileName>w25q128.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\W25Q128\w25q128.c</FilePath>
+            </File>
+            <File>
+              <FileName>flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\FLASH\flash.c</FilePath>
+            </File>
+            <File>
+              <FileName>key.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\KEY\key.c</FilePath>
+            </File>
+            <File>
+              <FileName>rtc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\RTC\rtc.c</FilePath>
+            </File>
+            <File>
+              <FileName>bmp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\OLED\bmp.c</FilePath>
+            </File>
+            <File>
+              <FileName>keyboard.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\KEYBOARD\keyboard.c</FilePath>
+            </File>
+            <File>
+              <FileName>at24c02.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\AT24C02\at24c02.c</FilePath>
+            </File>
+            <File>
+              <FileName>fpm383.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\FPM383\fpm383.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -522,6 +552,36 @@
               <FileName>stm32f4xx_usart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\FWLIB\src\stm32f4xx_usart.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f4xx_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FWLIB\src\stm32f4xx_flash.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f4xx_exti.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FWLIB\src\stm32f4xx_exti.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f4xx_syscfg.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FWLIB\src\stm32f4xx_syscfg.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f4xx_rtc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FWLIB\src\stm32f4xx_rtc.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f4xx_pwr.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FWLIB\src\stm32f4xx_pwr.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f4xx_tim.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FWLIB\src\stm32f4xx_tim.c</FilePath>
             </File>
           </Files>
         </Group>

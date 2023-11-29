@@ -19,13 +19,13 @@ void dht11_init(void)
 /*读取温湿度模块获取到的信息*/
 int32_t dht11_read(uint8_t *buf)
 {
+	static int cnt=0;
 	uint32_t t = 0;
 	int32_t i = 0, j = 0;
 	uint8_t d = 0;
 	uint8_t *p = buf;
 	uint8_t check_sum = 0;
 	int32_t flag = 0;
-
 	// 配置PG9端口
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;		 // 第9号引脚
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;	 // 输出功能模式
@@ -39,7 +39,6 @@ int32_t dht11_read(uint8_t *buf)
 	delay_ms(20);
 	PGout(9) = 1;
 	delay_us(30);
-
 	// 配置为输入模式
 	// 配置PG9端口
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;		 // 第9号引脚
@@ -76,6 +75,7 @@ int32_t dht11_read(uint8_t *buf)
 		if (t >= 100)
 			flag = -3;
 	}
+
 	for (j = 0; j < 5; j++)
 	{
 		for (d = 0, i = 7; i >= 0; i--)
@@ -119,6 +119,7 @@ int32_t dht11_read(uint8_t *buf)
 		flag = 0;
 	else
 		flag = -6;
+	printf("cnt=%d\r\n",cnt++);
 	return flag;
 }
 
