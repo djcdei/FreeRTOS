@@ -3,10 +3,14 @@
 #include "stdio.h"
 #include "stm32f4xx_conf.h"
 #include "sys.h"
+#define USART_PACKET_SIZE 64
+extern volatile uint8_t  g_usart1_rx_buf[USART_PACKET_SIZE];
+extern volatile uint32_t g_usart1_rx_cnt;
+extern volatile uint32_t g_usart1_rx_end;
 
 typedef struct __usart_t
 {
-	uint8_t rx_buf[64];
+	uint8_t rx_buf[USART_PACKET_SIZE];
 	uint8_t rx_len;
 } usart_t;
 
@@ -14,5 +18,7 @@ typedef struct __usart_t
 extern void usart1_init(u32 baud);
 extern void usart2_init(uint32_t baud);
 extern void usart3_init(u32 baud);
+extern void usart_send_str(USART_TypeDef* USARTx,char *str);
+extern void usart_send_bytes(USART_TypeDef* USARTx,uint8_t *buf,uint32_t len);
 
 #endif

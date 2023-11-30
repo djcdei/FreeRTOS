@@ -368,7 +368,6 @@ int32_t fpm_idenify_auto(uint16_t *id)
 	/* 成功匹配到指纹的ID值 */
 	*id = (g_usart2_buf[11]<<8)|g_usart2_buf[12];
 	
-
 	
 	/* 正确返回 */ 	
 	return 0;

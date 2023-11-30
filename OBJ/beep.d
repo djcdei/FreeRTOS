@@ -68,6 +68,7 @@
 ..\obj\beep.o: ..\HARDWARE\AT24C02\at24c02.h
 ..\obj\beep.o: ..\USER\includes.h
 ..\obj\beep.o: ..\HARDWARE\FPM383\fpm383.h
+..\obj\beep.o: ..\HARDWARE\FR1002\fr1002.h
 ..\obj\beep.o: ..\HARDWARE\RTC\rtc.h
 ..\obj\beep.o: ..\HARDWARE\BEEP\beep.h
 ..\obj\beep.o: ..\HARDWARE\OLED\oled.h

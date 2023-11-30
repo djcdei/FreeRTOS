@@ -67,6 +67,9 @@ void flash_read(uint32_t num)
 			case MODE_OPEN_LOCK_SFM:
 				sprintf((char *)buf, "%s", "sfm unlock");
 				break;
+			case MODE_OPEN_LOCK_FRM:
+				sprintf((char *)buf, "%s", "frm unlock");
+				break;
 			default:
 				break;
 			}

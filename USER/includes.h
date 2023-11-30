@@ -26,6 +26,7 @@
 #include "MFRC522.h"
 #include "at24c02.h"
 #include "fpm383.h"
+#include "fr1002.h"
 // #include "mpu6050.h"
 // #include "inv_mpu.h"
 // #include "inv_mpu_dmp_motion_driver.h"
@@ -73,6 +74,14 @@
 #define EVENT_GROUP_FPM_AUTH 0X10000  // 验证指纹
 #define EVENT_GROUP_FPM_SHOW 0X20000  // 显示当前指纹个数
 
+/*3D人脸识别模块相关的事件标志*/
+#define EVENT_GROUP_FACE_ADD 0X40000	// 添加人脸
+#define EVENT_GROUP_FACE_DELETE 0X80000 // 删除人脸
+#define EVENT_GROUP_FACE_AUTH 0X100000	// 验证人脸
+#define EVENT_GROUP_FACE_SHOW 0X200000	// 显示当前人脸个数
+#define EVENT_GROUP_FACE_OK 0x400000	// 人脸识别完成标志
+#define EVENT_GROUP_FACE_AGAIN 0x800000	//人脸识别失败，再次识别
+
 /*队列长度宏定义*/
 #define QUEUE_USART_LEN 4 /* 队列的长度，最大可包含多少个消息 */
 #define QUEUE_LED_LEN 4	  /* 队列的长度，最大可包含多少个消息 */
@@ -80,6 +89,7 @@
 #define QUEUE_OLED_LEN 16 /* 队列的长度，最大可包含多少个消息 */
 #define QUEUE_FLASH_LEN 16
 #define QUEUE_KEYBOARD_LEN 4 /*矩阵键盘队列长度*/
+#define QUEUE_FSM_LEN 16 
 
 /*rtc标志位*/
 #define FLAG_RTC_GET_NONE 0
@@ -107,6 +117,8 @@ extern EventGroupHandle_t g_event_group;
 
 /*串口队列*/
 extern QueueHandle_t g_queue_usart;
+/* 人脸队列句柄 */
+extern QueueHandle_t 	g_queue_frm;
 
 /* 相关硬件消息类型结构设计 */
 

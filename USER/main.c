@@ -18,6 +18,7 @@ static TaskHandle_t app_task_mfrc522real_handle = NULL;
 static TaskHandle_t app_task_mfrc522admin_handle = NULL;
 static TaskHandle_t app_task_password_man_handle = NULL;
 static TaskHandle_t app_task_fpm383_handle = NULL;
+static TaskHandle_t app_task_fr1002_handle = NULL;
 
 /*任务函数入口*/
 static void app_task_init(void *pvParameters);		   /* 	设备初始化任务 */
@@ -36,6 +37,7 @@ static void app_task_mfrc522real(void *pvParameters);  /*	rfid读卡任务函数*/
 static void app_task_mfrc522admin(void *pvParameters); /*	rfid管理任务函数*/
 static void app_task_password_man(void *pvParameters); /*	password management任务，接收矩阵键盘队列的信息并解析*/
 static void app_task_fpm383(void *pvParameters);	   /*	fpm383电容指纹任务函数*/
+static void app_task_fr1002(void *pvParameters);	   /*	fr1002人脸识别任务函数*/
 /*计数型信号量句柄*/
 SemaphoreHandle_t g_sem_led;  // 同步led任务和其他任务
 SemaphoreHandle_t g_sem_beep; // 同步beep任务和其他任务
@@ -53,6 +55,7 @@ QueueHandle_t g_queue_beep;
 QueueHandle_t g_queue_oled;
 QueueHandle_t g_queue_flash;
 QueueHandle_t g_queue_keyboard;
+QueueHandle_t g_queue_frm;
 
 /*全局变量*/
 volatile uint32_t g_rtc_get_what = FLAG_RTC_GET_NONE;
@@ -101,10 +104,11 @@ static const task_t task_tbl[] = {
 	{app_task_led, "app_task_led", 512, NULL, 5, &app_task_led_handle},
 	{app_task_led_breath, "app_task_led_breath", 512, NULL, 5, &app_task_led_breath_handle},
 	{app_task_beep, "app_task_beep", 512, NULL, 5, &app_task_beep_handle},
-	{app_task_sr04, "app_task_sr04", 512, NULL, 5, &app_task_sr04_handle},
+	{app_task_sr04, "app_task_sr04", 1024, NULL, 5, &app_task_sr04_handle},
 	{app_task_oled, "app_task_oled", 512, NULL, 5, &app_task_oled_handle},
 	{app_task_password_man, "app_task_password_man", 512, NULL, 5, &app_task_password_man_handle},
 	{app_task_fpm383, "app_task_fpm383", 512, NULL, 5, &app_task_fpm383_handle},
+	{app_task_fr1002, "app_task_fr1002", 1024, NULL, 5, &app_task_fr1002_handle},
 	{0, 0, 0, 0, 0, 0}};
 
 static void app_task_init(void *pvParameters)
@@ -139,7 +143,7 @@ static void app_task_init(void *pvParameters)
 	g_queue_usart = xQueueCreate(QUEUE_USART_LEN, sizeof(usart_t));		  // 用于usart通信的消息队列
 	g_queue_flash = xQueueCreate(QUEUE_FLASH_LEN, sizeof(flash_t));		  // 用于flash通信的消息队列
 	g_queue_keyboard = xQueueCreate(QUEUE_KEYBOARD_LEN, sizeof(uint8_t)); // 用于keyboard通信的消息队列
-
+	g_queue_frm = xQueueCreate(QUEUE_FSM_LEN, sizeof(g_usart1_rx_buf));	  // 用于fr1002通信的消息队列
 	/*实现了复位不重置flash和实时时钟当前日期时间*/
 	if (RTC_ReadBackupRegister(RTC_BKP_DR0) != 4455)
 	{
@@ -155,12 +159,14 @@ static void app_task_init(void *pvParameters)
 	led_init();
 	led_breath_init();
 	beep_init();
+
 	sr04_init();
 	dht11_init();
 	key_init();
 	kbd_init();
 	OLED_Init();
 	fpm_init();
+
 	OLED_Clear();
 	/* 显示logo */
 	OLED_DrawBMP(0, 0, 128, 8, (uint8_t *)pic_logo);
@@ -377,6 +383,7 @@ static void app_task_key(void *pvParameters)
 				printf("[app_task_key] S4 Press\r\n");
 				// 发送删除指纹事件
 				xEventGroupSetBits(g_event_group, EVENT_GROUP_FPM_DELETE);
+
 				vTaskResume(app_task_rtc_handle);	// 恢复rtc任务
 				g_rtc_get_what = FLAG_RTC_GET_TIME; // 获取时间
 				// g_rtc_get_what = FLAG_RTC_GET_DATE; // 获取日期
@@ -575,48 +582,70 @@ static void app_task_dht(void *pvParameters)
 /*超声波模块*/
 static void app_task_sr04(void *pvParameters)
 {
-	int distance_save;
+	int32_t distance = 0;
 	oled_t oled;
 	EventBits_t xReturn;
+	EventBits_t EventValue = 0;
 	for (;;) // while(1)
 	{
-		printf("app_task_sr04 is running ...\r\n");
-		distance_save = sr04_get_distance();
-		switch (distance_save)
+
+		printf("[app_task_sr04] is running ...\r\n");
+		distance = sr04_get_distance();
+		if (distance > 400)
 		{
-		case 0:
-			printf("distance error\r\n");
-			break;
-		case 1:
-			oled.ctrl = OLED_CTRL_DISPLAY_OFF;
+			oled.ctrl = OLED_CTRL_DISPLAY_OFF; /*息屏*/
 			xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
 								 &oled,		   /* 发送的消息内容 */
 								 100);		   /* 等待时间 100 Tick */
 			if (xReturn != pdPASS)
-				printf("[app_task_rtc] xQueueSend oled string error code is %d\r\n", xReturn);
-			break;
-		case 2:
-			// 息屏
-			oled.ctrl = OLED_CTRL_DISPLAY_OFF;
-			xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
-								 &oled,		   /* 发送的消息内容 */
-								 100);		   /* 等待时间 100 Tick */
-			if (xReturn != pdPASS)
-				printf("[app_task_rtc] xQueueSend oled string error code is %d\r\n", xReturn);
-			break;
-		case 3:
+				printf("[app_task_sr04] xQueueSend oled string error code is %d\r\n", xReturn);
+		}
+
+		if (distance >= 20 && distance <= 400)
+		{
 			// 亮屏
 			oled.ctrl = OLED_CTRL_DISPLAY_ON;
 			xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
 								 &oled,		   /* 发送的消息内容 */
 								 100);		   /* 等待时间 100 Tick */
 			if (xReturn != pdPASS)
-				printf("[app_task_rtc] xQueueSend oled string error code is %d\r\n", xReturn);
-			break;
-		default:
-			break;
+				printf("[app_task_sr04] xQueueSend oled string error code is %d\r\n", xReturn);
+			if (g_unlock_what == FLAG_UNLOCK_NO) // 设备上锁期间才能进行人脸识别
+			{									 // 发送验证人脸事件
+				xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_AUTH);
+				// 等待人脸识别成功标志
+				/* 等待人脸识别完毕 */
+				printf("[app_task_sr04] xEventGroupSetBits wait...\r\n");
+				EventValue = xEventGroupWaitBits((EventGroupHandle_t)g_event_group,
+												 (EventBits_t)EVENT_GROUP_FACE_OK | EVENT_GROUP_FACE_AGAIN,
+												 (BaseType_t)pdTRUE,
+												 (BaseType_t)pdFALSE,
+												 (TickType_t)portMAX_DELAY);
+
+				if (EventValue & EVENT_GROUP_FACE_OK) // 人脸验证成功
+				{
+					while (1)
+					{
+						distance = sr04_get_distance();
+						if (distance >= 20 && distance <= 400)
+						{
+							printf("[app_task_sr04] 人脸识别成功了,请开门...\r\n");
+						}
+						else if (distance > 400)
+							break;
+						delay_ms(500);
+					}
+				}
+				/*人脸识别失败，重新触发*/
+				if (EventValue & EVENT_GROUP_FACE_AGAIN) // 人脸验证失败或者设备重新上锁
+				{
+					printf("[app_task_sr04] 人脸识别失败再次触发人脸识别...\r\n");
+					delay_ms(500);
+				}
+			}
 		}
-		vTaskDelay(3000);
+
+		delay_ms(500);
 	}
 }
 /*oled模块*/
@@ -903,11 +932,29 @@ void app_task_password_man(void *pvParameters)
 		if (xReturn != pdPASS)
 			continue;
 
+		if (key_val == 'A')
+		{
+			// 发送注册人脸事件
+			xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_ADD);
+		}
+		if (key_val == 'B')
+		{
+			// 发送查询人脸个数事件
+			xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_SHOW);
+		}
+		if (key_val == 'D')
+		{
+			// 发送删除人脸事件
+			xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_DELETE);
+		}
+
 		if (key_val == 'C')
 		{
 			printf("password reset\r\n");
 			g_unlock_what = FLAG_UNLOCK_NO;		  // 设备上锁
 			g_pass_man_what = FLAG_PASS_MAN_AUTH; // 开始密码验证
+
+			xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_AGAIN); // 发送设备上锁从新验证人脸事件
 			/*恢复初值*/
 			x = x_start;
 			y = y_start;
@@ -1129,7 +1176,7 @@ void app_task_fpm383(void *pvParameters)
 										 (BaseType_t)pdTRUE,
 										 (BaseType_t)pdFALSE,
 										 (TickType_t)portMAX_DELAY);
-										 
+
 		if (g_unlock_what == FLAG_UNLOCK_NO) // 设备上锁后才能解锁
 		{
 			if (EventValue & EVENT_GROUP_FPM_AUTH) // 验证指纹事件
@@ -1324,6 +1371,253 @@ void app_task_fpm383(void *pvParameters)
 			}
 		}
 		vTaskResume(app_task_sr04_handle); // 恢复超声波模块
+	}
+}
+/*人脸识别模块*/
+void app_task_fr1002(void *pvParameters)
+{
+	uint8_t buf[64] = {0};
+	int32_t user_total;
+	int32_t distance = 0;
+	uint32_t t = 0;
+	beep_t beep;
+	oled_t oled;
+	flash_t flash;
+	EventBits_t EventValue;
+	BaseType_t xReturn = pdFALSE;
+	printf("[app_task_fr1002] create success\r\n");
+
+	while (fr_init(115200) != 0)
+	{
+		delay_ms(1000);
+
+		printf("[app_task_init] 3D人脸识别模块连接中 ...\r\n");
+	}
+	printf("[app_task_init] 3D人脸识别模块已连接上\r\n");
+
+	for (;;)
+	{
+		// 等待事件组中的相应事件位，或同步
+		EventValue = xEventGroupWaitBits((EventGroupHandle_t)g_event_group,
+										 (EventBits_t)EVENT_GROUP_FACE_ADD | EVENT_GROUP_FACE_AUTH | EVENT_GROUP_FACE_DELETE | EVENT_GROUP_FACE_SHOW,
+										 (BaseType_t)pdTRUE,
+										 (BaseType_t)pdFALSE,
+										 (TickType_t)portMAX_DELAY);
+
+		printf("[app_task_fr1002] is running...\r\n");
+		if (g_unlock_what == FLAG_UNLOCK_NO) // 设备上锁后才能解锁
+		{
+			if (EventValue & EVENT_GROUP_FACE_AUTH)
+			{
+				printf("[ap_task_fr1002] 执行验证人脸操作\r\n");
+				memset(buf, 0, sizeof buf);
+				if (0 == fr_match(buf))
+				{
+					printf("[app_task_fr1002] 人脸匹配成功!\r\n");
+					// 发送验证人脸成功事件
+					if (g_unlock_what == FLAG_UNLOCK_NO)
+					{
+						xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_OK);
+						g_unlock_what = FLAG_UNLOCK_OK;
+						g_pass_unlock_mode = MODE_OPEN_LOCK_FRM;
+						/*显示解锁成功界面*/
+						/* 设置要显示的图片-表情（成功） */
+						oled.x = 32;
+						oled.y = 0;
+						oled.pic_width = 64;
+						oled.pic_height = 8;
+						oled.ctrl = OLED_CTRL_SHOW_PICTURE;
+						oled.pic = pic_unlock_icon;
+
+						xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+											 &oled,		   /* 发送的消息内容 */
+											 100);		   /* 等待时间 100 Tick */
+						if (xReturn != pdPASS)
+							printf("[app_task_pass_man] xQueueSend oled picture error code is %d\r\n", xReturn);
+
+						/* 嘀一声示意:第一次 */
+						beep.sta = 1;
+						beep.duration = 50;
+						xReturn = xQueueSend(g_queue_beep, /* 消息队列的句柄 */
+											 &beep,		   /* 发送的消息内容 */
+											 100);		   /* 等待时间 100 Tick */
+						if (xReturn != pdPASS)
+							printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+						/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+						xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
+						if (xReturn != pdPASS)
+							printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						vTaskDelay(100);
+						/* 嘀一声示意:第二次 */
+						beep.sta = 1;
+						beep.duration = 50;
+						xReturn = xQueueSend(g_queue_beep, /* 消息队列的句柄 */
+											 &beep,		   /* 发送的消息内容 */
+											 100);		   /* 等待时间 100 Tick */
+						if (xReturn != pdPASS)
+							printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+						/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+						xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
+						if (xReturn != pdPASS)
+							printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						/* 延时一会 */
+						vTaskDelay(2000);
+						//  发送flash消息记录解锁日志
+						flash.mode = g_pass_unlock_mode; // 获取当前解锁模式，有蓝牙解锁、键盘解锁，存入flash
+						xReturn = xQueueSend(g_queue_flash, &flash, 100);
+						if (xReturn != pdPASS)
+							printf("[app_task_pass_man] xQueueSend flash error code is %d\r\n", xReturn);
+					}
+				}
+				else
+				{
+					printf("[app_task_fr1002] 人脸匹配失败!\r\n");
+					// 发送验证人脸失败并需要再次验证事件
+					if (g_unlock_what == FLAG_UNLOCK_NO)
+					{
+						xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_AGAIN);
+						/*显示人脸解锁失败界面*/
+						/* 设置要显示的图片-表情（失败） */
+						oled.x = 32;
+						oled.y = 0;
+						oled.pic_width = 64;
+						oled.pic_height = 8;
+						oled.ctrl = OLED_CTRL_SHOW_PICTURE;
+						oled.pic = pic_error_icon;
+
+						xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+											 &oled,		   /* 发送的消息内容 */
+											 100);		   /* 等待时间 100 Tick */
+						if (xReturn != pdPASS)
+							printf("[app_task_pass_man] xQueueSend oled picture error code is %d\r\n", xReturn);
+
+						/* 长鸣1秒示意 */
+						beep.sta = 1;
+						beep.duration = 1000;
+						xReturn = xQueueSend(g_queue_beep, /* 消息队列的句柄 */
+											 &beep,		   /* 发送的消息内容 */
+											 100);		   /* 等待时间 100 Tick */
+						if (xReturn != pdPASS)
+							printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+
+						/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+						xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
+						if (xReturn != pdPASS)
+							printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						/* 延时一会 */
+						vTaskDelay(2000);
+						/* 显示锁屏界面 */
+						oled.ctrl = OLED_CTRL_SHOW_PICTURE;
+						oled.x = 32;
+						oled.y = 0;
+						oled.pic_width = 64;
+						oled.pic_height = 8;
+						oled.pic = pic_lock_icon;
+						xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+											 &oled,		   /* 发送的消息内容 */
+											 100);		   /* 等待时间 100 Tick */
+						if (xReturn != pdPASS)
+							printf("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
+					}
+				}
+				delay_ms(500);
+				/* 进入掉电模式 */
+				fr_power_down();
+				delay_ms(500);
+				g_pass_unlock_mode = MODE_OPEN_LOCK_KEYBOARD; // 恢复默认解锁方式
+			}
+		}
+
+		if (g_unlock_what == FLAG_UNLOCK_OK) // 执行其他操作
+		{
+			if (EventValue & EVENT_GROUP_FACE_ADD) // 添加人脸
+			{
+				printf("[ap_task_fr1002] 执行添加人脸操作\r\n");
+				if (0 == fr_reg_user("twen"))
+				{
+					printf("[app_task_fr1002] 注册用户成功!\r\n");
+					/* 嘀一声示意:第一次 */
+					beep.sta = 1;
+					beep.duration = 50;
+					xReturn = xQueueSend(g_queue_beep, /* 消息队列的句柄 */
+										 &beep,		   /* 发送的消息内容 */
+										 100);		   /* 等待时间 100 Tick */
+					if (xReturn != pdPASS)
+						printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+					/* 嘀一声示意:第二次 */
+					beep.sta = 1;
+					beep.duration = 50;
+					xReturn = xQueueSend(g_queue_beep, /* 消息队列的句柄 */
+										 &beep,		   /* 发送的消息内容 */
+										 100);		   /* 等待时间 100 Tick */
+					if (xReturn != pdPASS)
+						printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+				}
+				else
+				{
+					printf("[app_task_fr1002] 注册用户失败!\r\n");
+					/* 嘀一声示意	*/
+					beep.sta = 1;
+					beep.duration = 50;
+					xReturn = xQueueSend(g_queue_beep, /* 消息队列的句柄 */
+										 &beep,		   /* 发送的消息内容 */
+										 100);		   /* 等待时间 100 Tick */
+					if (xReturn != pdPASS)
+						printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+				}
+				delay_ms(500);
+				/* 进入掉电模式 */
+				fr_power_down();
+				delay_ms(500);
+			}
+
+			if (EventValue & EVENT_GROUP_FACE_SHOW) // 查询人脸个数
+			{
+				user_total = fr_get_user_total();
+
+				if (user_total < 0)
+				{
+					printf("[app_task_fr1002] 获取已注册的用户总数失败!\r\n");
+				}
+				else
+				{
+					printf("[app_task_fr1002] 获取已注册的用户总数:%d\r\n", user_total);
+				}
+				delay_ms(500);
+				/* 进入掉电模式 */
+				fr_power_down();
+				delay_ms(500);
+			}
+
+			if (EventValue & EVENT_GROUP_FACE_DELETE) // 删除人脸
+			{
+				if (0 == fr_del_user_all())
+				{
+					printf("[app_task_fr1002] 删除所有用户成功!\r\n");
+					// beep_on();delay_ms(100);beep_off();
+				}
+				else
+				{
+					printf("[app_task_fr1002] 删除所有用户失败!\r\n");
+				}
+				delay_ms(500);
+				/* 进入掉电模式 */
+				fr_power_down();
+				delay_ms(500);
+			}
+		}
 	}
 }
 

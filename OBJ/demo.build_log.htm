@@ -22,46 +22,38 @@ Dialog DLL:      TCM.DLL V1.14.4.0
  
 <h2>Project:</h2>
 d:\STM32Project\FreeRTOS\USER\FreeRTOS.uvprojx
-Project File Date:  11/29/2023
+Project File Date:  11/30/2023
 
 <h2>Output:</h2>
 Build target 'FreeRTOS'
 compiling main.c...
-main.c(286): warning:  #520-D: initialization with "{...}" expected for aggregate object
+main.c(292): warning:  #520-D: initialization with "{...}" expected for aggregate object
         uint8_t buf[16] = 0;
-main.c(286): warning:  #177-D: variable "buf" was declared but never referenced
+main.c(292): warning:  #177-D: variable "buf" was declared but never referenced
         uint8_t buf[16] = 0;
-main.c(287): warning:  #177-D: variable "beep" was declared but never referenced
+main.c(293): warning:  #177-D: variable "beep" was declared but never referenced
         beep_t beep;
-main.c(506): warning:  #177-D: variable "cnt" was declared but never referenced
+main.c(513): warning:  #177-D: variable "cnt" was declared but never referenced
         static uint32_t cnt = 0; // 限制记录的温度只有10条
-main.c(883): warning:  #177-D: variable "pass_auth_eeprom" was declared but never referenced
+main.c(912): warning:  #177-D: variable "pass_auth_eeprom" was declared but never referenced
         char pass_auth_eeprom[PASS_LEN] = {0}; // 存储在e2prom里面的密码
+main.c(1381): warning:  #177-D: variable "distance" was declared but never referenced
+        int32_t distance = 0;
+main.c(1382): warning:  #177-D: variable "t" was declared but never referenced
+        uint32_t t = 0;
 main.c(17): warning:  #177-D: variable "app_task_mfrc522real_handle" was declared but never referenced
   static TaskHandle_t app_task_mfrc522real_handle = NULL;
 main.c(18): warning:  #177-D: variable "app_task_mfrc522admin_handle" was declared but never referenced
   static TaskHandle_t app_task_mfrc522admin_handle = NULL;
-main.c(35): warning:  #177-D: function "app_task_mfrc522real" was declared but never referenced
+main.c(36): warning:  #177-D: function "app_task_mfrc522real" was declared but never referenced
   static void app_task_mfrc522real(void *pvParameters);  /*     rfid读卡任务函数*/
-main.c(36): warning:  #177-D: function "app_task_mfrc522admin" was declared but never referenced
+main.c(37): warning:  #177-D: function "app_task_mfrc522admin" was declared but never referenced
   static void app_task_mfrc522admin(void *pvParameters); /*     rfid管理任务函数*/
-main.c: 9 warnings, 0 errors
-compiling beep.c...
-compiling oled.c...
-compiling key.c...
-compiling rtc.c...
-compiling bmp.c...
-compiling keyboard.c...
-compiling at24c02.c...
-..\HARDWARE\AT24C02\at24c02.c(266): warning:  #1-D: last line of file ends without a newline
-  }
-..\HARDWARE\AT24C02\at24c02.c: 1 warning, 0 errors
-compiling fpm383.c...
-compiling usart.c...
+main.c: 11 warnings, 0 errors
 linking...
-Program Size: Code=32904 RO-data=8828 RW-data=348 ZI-data=79420  
+Program Size: Code=34252 RO-data=8692 RW-data=360 ZI-data=79560  
 FromELF: creating hex file...
-"..\OBJ\demo.axf" - 0 Error(s), 10 Warning(s).
+"..\OBJ\demo.axf" - 0 Error(s), 11 Warning(s).
 
 <h2>Collection of Component include folders:</h2>
   d:\STM32Project\FreeRTOS\USER\RTE

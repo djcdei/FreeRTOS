@@ -1,6 +1,11 @@
 #include "includes.h"
+
 // 加入以下代码,支持printf函数,而不需要选择use MicroLIB
 static usart_t g_usart_packet;
+
+volatile uint8_t g_usart1_rx_buf[USART_PACKET_SIZE];
+volatile uint32_t g_usart1_rx_cnt = 0;
+volatile uint32_t g_usart1_rx_end = 0;
 
 #pragma import(__use_no_semihosting)
 // 标准库需要的支持函数
@@ -109,8 +114,8 @@ void usart2_init(uint32_t baud)
 	USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
 
 	NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 	// 使能串口2工作
@@ -163,54 +168,128 @@ void usart3_init(u32 baud)
 	NVIC_Init(&NVIC_InitStructure);
 }
 
-// 串口1中断服务程序
+void usart_send_str(USART_TypeDef *USARTx, char *str)
+{
+	char *p = str;
+
+	while (*p != '\0')
+	{
+		USART_SendData(USARTx, *p);
+
+		p++;
+
+		// 等待数据发送成功
+		while (USART_GetFlagStatus(USARTx, USART_FLAG_TXE) == RESET)
+			;
+		USART_ClearFlag(USARTx, USART_FLAG_TXE);
+	}
+}
+
+void usart_send_bytes(USART_TypeDef *USARTx, uint8_t *buf, uint32_t len)
+{
+	uint8_t *p = buf;
+
+	while (len--)
+	{
+		USART_SendData(USARTx, *p);
+
+		p++;
+
+		// 等待数据发送成功
+		while (USART_GetFlagStatus(USARTx, USART_FLAG_TXE) == RESET)
+			;
+		USART_ClearFlag(USARTx, USART_FLAG_TXE);
+	}
+}
+
+// // 串口1中断服务程序
+// void USART1_IRQHandler(void)
+// {
+// 	static uint32_t i = 0;
+
+// 	uint8_t data;
+
+// 	uint32_t ulReturn;
+
+// 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+// 	/* 进入临界段，临界段可以嵌套 */
+// 	ulReturn = taskENTER_CRITICAL_FROM_ISR();
+
+// 	if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
+// 	{
+// 		// 接收串口数据
+// 		data = USART_ReceiveData(USART1);
+
+// 		g_usart_packet.rx_buf[i++] = data;
+
+// 		// 检测到'#'符或接收的数据满的时候则发送数据
+// 		if (data == '#' || i >= (sizeof g_usart_packet.rx_buf))
+// 		{
+// 			g_usart_packet.rx_len = i;
+
+// 			xQueueSendFromISR(g_queue_usart, (void *)&g_usart_packet, &xHigherPriorityTaskWoken); // 将串口数据包发送到串口队列
+
+// 			memset(&g_usart_packet, 0, sizeof g_usart_packet);
+
+// 			i = 0;
+// 		}
+
+// 		// 清空串口接收中断标志位
+// 		USART_ClearITPendingBit(USART1, USART_IT_RXNE);
+// 	}
+
+// 	/* 若接收消息队列任务的优先级高于当前运行的任务，则退出中断后立即进行任务切换，执行前者 */
+// 	if (xHigherPriorityTaskWoken)
+// 	{
+// 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+// 	}
+
+// 	/* 退出临界段 */
+// 	taskEXIT_CRITICAL_FROM_ISR(ulReturn);
+// }
+
+// 串口1，用于人脸识别模块通信
 void USART1_IRQHandler(void)
 {
-	static uint32_t i = 0;
-
-	uint8_t data;
+	uint8_t d;
 
 	uint32_t ulReturn;
-
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
 	/* 进入临界段，临界段可以嵌套 */
 	ulReturn = taskENTER_CRITICAL_FROM_ISR();
 
-	if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
+	// 检测是否接收到数据
+	if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET)
 	{
-		// 接收串口数据
-		data = USART_ReceiveData(USART1);
+		d = USART_ReceiveData(USART1);
 
-		g_usart_packet.rx_buf[i++] = data;
-
-		// 检测到'#'符或接收的数据满的时候则发送数据
-		if (data == '#' || i >= (sizeof g_usart_packet.rx_buf))
+		if (g_usart1_rx_cnt < sizeof(g_usart1_rx_buf))
 		{
-			g_usart_packet.rx_len = i;
-
-			xQueueSendFromISR(g_queue_usart, (void *)&g_usart_packet, &xHigherPriorityTaskWoken); // 将串口数据包发送到串口队列
-
-			memset(&g_usart_packet, 0, sizeof g_usart_packet);
-
-			i = 0;
+			g_usart1_rx_buf[g_usart1_rx_cnt++] = d;
 		}
 
-		// 清空串口接收中断标志位
-		USART_ClearITPendingBit(USART1, USART_IT_RXNE);
-	}
+		/* 清除定时器2的时间更新标志位 */
+		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 
-	/* 若接收消息队列任务的优先级高于当前运行的任务，则退出中断后立即进行任务切换，执行前者 */
-	if (xHigherPriorityTaskWoken)
-	{
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+		/* 关闭定时器3 */
+		TIM_Cmd(TIM2, DISABLE);
+
+		/* 清空当前计数值 */
+		TIM_SetCounter(TIM2, 0);
+
+		/* 启动定时器2 */
+		TIM_Cmd(TIM2, ENABLE);
+
+		// 清空标志位，可以响应新的中断请求
+		USART_ClearITPendingBit(USART1, USART_IT_RXNE);
 	}
 
 	/* 退出临界段 */
 	taskEXIT_CRITICAL_FROM_ISR(ulReturn);
 }
 
-// 串口3中断服务程序,
+// 串口3中断服务程序,用于蓝牙通信
 void USART3_IRQHandler(void)
 {
 	static uint32_t i = 0;

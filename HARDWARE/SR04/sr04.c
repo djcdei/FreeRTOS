@@ -27,40 +27,42 @@ void sr04_init(void)
 	GPIO_Init(GPIOE, &GPIO_InitStructure);
 }
 /*根据时序图封装超声波获取距离信息的函数*/
-int sr04_get_distance(void)
+int32_t sr04_get_distance(void)
 {
-	double distance = 0;
-	int32_t save = 0;
-	int32_t cnt = 0;
-	PBout(6) = 1;
-	delay_us(10); // 延时10us之后使得PB6电平变为低电平
-	PBout(6) = 0;
-	// 等待回响信号变为高电平
-	while (PEin(6) == 0);
-
-	while (PEin(6) == 1) // 检测回响电平持续时间，通过计算转换为距离
+	int32_t t=0;
+	PBout(6)=1;
+	delay_us(20);
+	PBout(6)=0;
+	
+	//等待回响信号变为高电平
+	while(PEin(6)==0)
 	{
-		cnt++;
+		t++;
+		delay_us(1);
+		
+		//如果超时，就返回一个错误码
+		if(t>=1000000)
+			return -1;
+	}
+	
+	t=0;
+	//测量高电平持续的时间
+	while(PEin(6))
+	{
+	
+		//延时9us,就是3mm的传输距离
 		delay_us(9);
+		
+		t++;
+		
+		//如果超时，就返回一个错误码
+		if(t>=100000)
+			return -1;		
+	
 	}
-	distance = (double)(3 * cnt / 2);
-	if (distance >= 20 && distance <= 200)
-	{
-		printf("distance = %.3lfmm \r\n", distance);
-		save = 3; // 危险等级3
-	}
-	else if (distance > 200 && distance <= 2000)
-	{
-		printf("distance = %.3lfmm \r\n", distance);
-		save = 2; // 危险等级2
-	}
-	else
-	{
-		printf("distance = %.3lfmm \r\n", distance);
-		save = 1; // 危险等级1
-	}
-
-	return save;
+	printf("distance :%d\n",3*(t/2));
+	//当前的传输距离
+	return 3*(t/2);
 }
 
 

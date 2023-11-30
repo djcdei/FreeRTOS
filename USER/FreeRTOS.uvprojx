@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40_41xxx,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\HARDWARE\LED;..\FREERTOS\include;..\FREERTOS\port;..\HARDWARE\DHT11;..\HARDWARE\SR04;..\HARDWARE\BEEP;..\HARDWARE\FLASH;..\HARDWARE\KEY;..\HARDWARE\RTC;..\HARDWARE\OLED;..\HARDWARE\MFRC522;..\HARDWARE\KEYBOARD;..\HARDWARE\AT24C02;..\HARDWARE\FPM383</IncludePath>
+              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\HARDWARE\LED;..\FREERTOS\include;..\FREERTOS\port;..\HARDWARE\DHT11;..\HARDWARE\SR04;..\HARDWARE\BEEP;..\HARDWARE\FLASH;..\HARDWARE\KEY;..\HARDWARE\RTC;..\HARDWARE\OLED;..\HARDWARE\MFRC522;..\HARDWARE\KEYBOARD;..\HARDWARE\AT24C02;..\HARDWARE\FPM383;..\HARDWARE\FR1002</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -497,6 +497,11 @@
               <FileName>fpm383.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\FPM383\fpm383.c</FilePath>
+            </File>
+            <File>
+              <FileName>fr1002.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\FR1002\fr1002.c</FilePath>
             </File>
           </Files>
         </Group>
