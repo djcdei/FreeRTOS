@@ -21,14 +21,12 @@ static void tim2_init(void)
 
 	// 配置tim2的分频值、计数值
 	// tim2硬件时钟=84MHz/8400=10000Hz，就是进行10000次计数，就是1秒时间的到达
-
 	TIM_TimeBaseStructure.TIM_Period = 10000 / 100 - 1; // 计数值0 -> 99就是10毫秒时间的到达
 	TIM_TimeBaseStructure.TIM_Prescaler = 8400 - 1;		// 预分频值8400
 	TIM_TimeBaseStructure.TIM_ClockDivision = 0;		// 时钟分频，当前是没有的，不需要进行配置
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
 
 	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
-
 	// 配置tim2的中断
 	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
 
@@ -52,14 +50,14 @@ static void fr_printf_recv(uint8_t *buf, uint32_t len)
 	uint8_t *p = buf;
 	uint32_t i;
 
-	printf("fr recv buf:");
+	dgb_printf_safe("fr recv buf:");
 
 	for (i = 0; i < len; i++)
 	{
 		printf("%02X ", p[i]);
 	}
 
-	printf("\r\n");
+	dgb_printf_safe("\r\n");
 
 #else
 
@@ -72,47 +70,47 @@ static void fr_reply_info(uint8_t reply)
 {
 #if FR_DEBUG_EN
 	if (reply == 0x00)
-		printf("[人脸识别模块 REPLY] 成功\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 成功\r\n");
 	if (reply == 0x01)
-		printf("[人脸识别模块 REPLY] 模组拒绝该命令\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 模组拒绝该命令\r\n");
 	if (reply == 0x02)
-		printf("[人脸识别模块 REPLY] 录入/匹配算法已终止\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 录入/匹配算法已终止\r\n");
 	if (reply == 0x03)
-		printf("[人脸识别模块 REPLY] 发送消息错误\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 发送消息错误\r\n");
 	if (reply == 0x04)
-		printf("[人脸识别模块 REPLY] 相机打开失败\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 相机打开失败\r\n");
 	if (reply == 0x05)
-		printf("[人脸识别模块 REPLY] 未知错误\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 未知错误\r\n");
 	if (reply == 0x06)
-		printf("[人脸识别模块 REPLY] 无效的参数\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 无效的参数\r\n");
 	if (reply == 0x07)
-		printf("[人脸识别模块 REPLY] 内存不足\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 内存不足\r\n");
 	if (reply == 0x08)
-		printf("[人脸识别模块 REPLY] 没有已录入的用户\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 没有已录入的用户\r\n");
 	if (reply == 0x09)
-		printf("[人脸识别模块 REPLY] 录入超过最大用户数量\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 录入超过最大用户数量\r\n");
 	if (reply == 0x0A)
-		printf("[人脸识别模块 REPLY] 人脸已录入\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 人脸已录入\r\n");
 	if (reply == 0x0C)
-		printf("[人脸识别模块 REPLY] 活体检测失败\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 活体检测失败\r\n");
 	if (reply == 0x0D)
-		printf("[人脸识别模块 REPLY] 录入或解锁超时\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 录入或解锁超时\r\n");
 	if (reply == 0x0E)
-		printf("[人脸识别模块 REPLY] 加密芯片授权失败\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 加密芯片授权失败\r\n");
 	if (reply == 0x13)
-		printf("[人脸识别模块 REPLY] 读文件失败\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 读文件失败\r\n");
 	if (reply == 0x14)
-		printf("[人脸识别模块 REPLY] 写文件失败\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 写文件失败\r\n");
 	if (reply == 0x15)
-		printf("[人脸识别模块 REPLY] 通信协议未加密\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 通信协议未加密\r\n");
 	if (reply == 0x17)
-		printf("[人脸识别模块 REPLY] RGB图像没有ready\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] RGB图像没有ready\r\n");
 	if (reply == 0xFD)
-		printf("[人脸识别模块 REPLY] 无效信息ID，key未写入\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 无效信息ID，key未写入\r\n");
 	if (reply == 0xFE)
-		printf("[人脸识别模块 REPLY] 检测错误\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 检测错误\r\n");
 	if (reply == 0xFF)
-		printf("[人脸识别模块 REPLY] 编码错误\r\n");
+		dgb_printf_safe("[人脸识别模块 REPLY] 编码错误\r\n");
 #else
 
 	(void)0;
@@ -124,35 +122,35 @@ static void fr_note_info(uint8_t note)
 {
 #if FR_DEBUG_EN
 	if (note == 0x00)
-		printf("[人脸识别模块 NOTE] 人脸\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 人脸\r\n");
 	if (note == 0x01)
-		printf("[人脸识别模块 NOTE] 未检测到人脸\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 未检测到人脸\r\n");
 	if (note == 0x02)
-		printf("[人脸识别模块 NOTE] 人脸太靠近图片上边沿，未能录入\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 人脸太靠近图片上边沿，未能录入\r\n");
 	if (note == 0x03)
-		printf("[人脸识别模块 NOTE] 人脸太靠近图片下边沿，未能录入\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 人脸太靠近图片下边沿，未能录入\r\n");
 	if (note == 0x04)
-		printf("[人脸识别模块 NOTE] 人脸太靠近图片左边沿，未能录入\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 人脸太靠近图片左边沿，未能录入\r\n");
 	if (note == 0x05)
-		printf("[人脸识别模块 NOTE] 人脸太靠近图片右边沿，未能录入\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 人脸太靠近图片右边沿，未能录入\r\n");
 	if (note == 0x06)
-		printf("[人脸识别模块 NOTE] 人脸距离太远，未能录入\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 人脸距离太远，未能录入\r\n");
 	if (note == 0x07)
-		printf("[人脸识别模块 NOTE] 人脸距离太近，未能录入\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 人脸距离太近，未能录入\r\n");
 	if (note == 0x08)
-		printf("[人脸识别模块 NOTE] 眉毛遮挡\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 眉毛遮挡\r\n");
 	if (note == 0x09)
-		printf("[人脸识别模块 NOTE] 眼睛遮挡\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 眼睛遮挡\r\n");
 	if (note == 0x0A)
-		printf("[人脸识别模块 NOTE] 脸部遮挡\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 脸部遮挡\r\n");
 	if (note == 0x0B)
-		printf("[人脸识别模块 NOTE] 录入人脸方向错误\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 录入人脸方向错误\r\n");
 	if (note == 0x0C)
-		printf("[人脸识别模块 NOTE] 在闭眼模式检测到睁眼状态\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 在闭眼模式检测到睁眼状态\r\n");
 	if (note == 0x0D)
-		printf("[人脸识别模块 NOTE] 闭眼状态\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 闭眼状态\r\n");
 	if (note == 0x0E)
-		printf("[人脸识别模块 NOTE] 在闭眼模式检测中无法判定睁闭眼状态\r\n");
+		dgb_printf_safe("[人脸识别模块 NOTE] 在闭眼模式检测中无法判定睁闭眼状态\r\n");
 
 #else
 
@@ -200,7 +198,7 @@ int32_t fr_entry_standby(void)
 							timeout);	 /* 等待时间 */
 	if (xReturn != pdPASS)
 	{
-		printf("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
+		dgb_printf_safe("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
 		return -1;
 	}
 
@@ -282,7 +280,7 @@ int32_t fr_reg_admin(const char *name)
 							timeout);	 /* 等待时间 */
 	if (xReturn != pdPASS)
 	{
-		printf("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
+		dgb_printf_safe("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
 		return -1;
 	}
 
@@ -365,7 +363,7 @@ int32_t fr_reg_user(const char *name)
 							timeout);	 /* 等待时间 */
 	if (xReturn != pdPASS)
 	{
-		printf("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
+		dgb_printf_safe("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
 		return -1;
 	}
 
@@ -383,7 +381,7 @@ int32_t fr_reg_user(const char *name)
 									timeout);	 /* 等待时间 */
 			if (xReturn != pdPASS)
 			{
-				printf("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
+				dgb_printf_safe("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
 				return -1;
 			}
 
@@ -430,7 +428,7 @@ int32_t fr_del_user_all(void)
 							timeout);	 /* 等待时间 */
 	if (xReturn != pdPASS)
 	{
-		printf("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
+		dgb_printf_safe("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
 		return -1;
 	}
 
@@ -490,7 +488,7 @@ int32_t fr_match(uint8_t *buf)
 							timeout);	 /* 等待时间 */
 	if (xReturn != pdPASS)
 	{
-		printf("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
+		dgb_printf_safe("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
 		return -1;
 	}
 
@@ -509,7 +507,7 @@ int32_t fr_match(uint8_t *buf)
 									timeout);	 /* 等待时间 */
 			if (xReturn != pdPASS)
 			{
-				printf("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
+				dgb_printf_safe("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
 				return -1;
 			}
 
@@ -555,7 +553,7 @@ int32_t fr_state_get(void)
 							timeout);	 /* 等待时间 */
 	if (xReturn != pdPASS)
 	{
-		printf("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
+		dgb_printf_safe("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
 		return -1;
 	}
 
@@ -592,7 +590,7 @@ int32_t fr_get_user_total(void)
 							timeout);	 /* 等待时间 */
 	if (xReturn != pdPASS)
 	{
-		printf("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
+		dgb_printf_safe("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
 		return -1;
 	}
 
@@ -635,7 +633,7 @@ int32_t fr_power_down(void)
 							timeout);	 /* 等待时间 */
 	if (xReturn != pdPASS)
 	{
-		printf("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
+		dgb_printf_safe("[xQueueReceive] fr_power_down error code is %d\r\n", xReturn);
 		return -1;
 	}
 

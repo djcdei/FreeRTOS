@@ -1,4 +1,3 @@
-
 #include "includes.h"
 
 /*任务句柄，一个硬件一个任务句柄控制*/
@@ -19,6 +18,10 @@ static TaskHandle_t app_task_mfrc522admin_handle = NULL;
 static TaskHandle_t app_task_password_man_handle = NULL;
 static TaskHandle_t app_task_fpm383_handle = NULL;
 static TaskHandle_t app_task_fr1002_handle = NULL;
+static TaskHandle_t app_task_motor_handle = NULL;
+static TaskHandle_t app_task_mqtt_handle = NULL;
+static TaskHandle_t app_task_esp8266_handle = NULL;
+static TaskHandle_t app_task_monitor_handle = NULL;
 
 /*任务函数入口*/
 static void app_task_init(void *pvParameters);		   /* 	设备初始化任务 */
@@ -38,12 +41,20 @@ static void app_task_mfrc522admin(void *pvParameters); /*	rfid管理任务函数*/
 static void app_task_password_man(void *pvParameters); /*	password management任务，接收矩阵键盘队列的信息并解析*/
 static void app_task_fpm383(void *pvParameters);	   /*	fpm383电容指纹任务函数*/
 static void app_task_fr1002(void *pvParameters);	   /*	fr1002人脸识别任务函数*/
+static void app_task_motor(void *pvParameters);		   /*	motor步进电机任务函数*/
+static void app_task_mqtt(void *pvParameters);		   /* 	mqtt任务函数 */
+static void app_task_esp8266(void *pvParameters);	   /*	esp8266无限WIFI模块任务函数*/
+static void app_task_monitor(void *pvParameters);	   /*监控阿里云是否发送消息完成*/
+
 /*计数型信号量句柄*/
-SemaphoreHandle_t g_sem_led;  // 同步led任务和其他任务
-SemaphoreHandle_t g_sem_beep; // 同步beep任务和其他任务
+SemaphoreHandle_t g_sem_led;   // 同步led任务和其他任务
+SemaphoreHandle_t g_sem_beep;  // 同步beep任务和其他任务
+SemaphoreHandle_t g_sem_motor; // 同步motor任务和其他任务
 
 /*互斥型信号量句柄*/
 SemaphoreHandle_t g_mutex_oled;
+/* 互斥型信号量句柄 */
+SemaphoreHandle_t g_mutex_printf;
 
 /*事件标志组句柄（32bit位标志组）便于管理多个任务标志位*/
 EventGroupHandle_t g_event_group;
@@ -56,6 +67,36 @@ QueueHandle_t g_queue_oled;
 QueueHandle_t g_queue_flash;
 QueueHandle_t g_queue_keyboard;
 QueueHandle_t g_queue_frm;
+QueueHandle_t g_queue_motor;
+QueueHandle_t g_queue_esp8266; // 用于esp8266WIFI模块的通信
+
+static volatile uint32_t g_esp8266_init = 0;
+
+float g_temp = 0.0;
+float g_humi = 0.0;
+
+#define DEBUG_dgb_printf_safe_EN 1
+
+void dgb_printf_safe(const char *format, ...)
+{
+#if DEBUG_dgb_printf_safe_EN
+
+	va_list args;
+	va_start(args, format);
+
+	/* 获取互斥信号量 */
+	xSemaphoreTake(g_mutex_printf, portMAX_DELAY);
+
+	vprintf(format, args);
+
+	/* 释放互斥信号量 */
+	xSemaphoreGive(g_mutex_printf);
+
+	va_end(args);
+#else
+	(void)0;
+#endif
+}
 
 /*全局变量*/
 volatile uint32_t g_rtc_get_what = FLAG_RTC_GET_NONE;
@@ -64,6 +105,7 @@ volatile uint32_t g_unlock_what = FLAG_UNLOCK_NO;
 volatile uint32_t g_pass_man_what = FLAG_PASS_MAN_NONE;					 // 密码管理标志
 volatile uint32_t g_pass_unlock_mode = MODE_OPEN_LOCK_KEYBOARD;			 // 密码解锁模式。默认键盘解锁，根据不同解锁方式会自动更改该标志位
 const char pass_auth_default[PASS_LEN] = {'8', '8', '8', '8', '8', '8'}; // 默认密码
+volatile uint32_t g_ISR_dbg = 0;
 
 int main(void)
 {
@@ -76,7 +118,8 @@ int main(void)
 	//	/* 初始化串口1 */
 	//	usart1_init(115200);
 	/*初始化串口3*/
-	usart3_init(9600);
+	// usart3_init(9600);
+	usart6_init(9600);
 
 	/* 创建 app_task_init任务 */
 	xTaskCreate((TaskFunction_t)app_task_init,			/* 任务入口函数 */
@@ -108,13 +151,17 @@ static const task_t task_tbl[] = {
 	{app_task_oled, "app_task_oled", 512, NULL, 5, &app_task_oled_handle},
 	{app_task_password_man, "app_task_password_man", 512, NULL, 5, &app_task_password_man_handle},
 	{app_task_fpm383, "app_task_fpm383", 512, NULL, 5, &app_task_fpm383_handle},
-	{app_task_fr1002, "app_task_fr1002", 1024, NULL, 5, &app_task_fr1002_handle},
+	//{app_task_fr1002, "app_task_fr1002", 1024, NULL, 5, &app_task_fr1002_handle},
+	{app_task_motor, "app_task_motor", 512, NULL, 5, &app_task_motor_handle},
+	{app_task_mqtt, "app_task_mqtt", 512, NULL, 5, &app_task_mqtt_handle},
+	{app_task_monitor, "app_task_monitor", 512, NULL, 5, &app_task_monitor_handle},
+	{app_task_esp8266, "app_task_esp8266", 1024, NULL, 5, &app_task_esp8266_handle},
 	{0, 0, 0, 0, 0, 0}};
 
 static void app_task_init(void *pvParameters)
 {
 	uint32_t i = 0;
-	printf("app_task_init is running ...\r\n");
+	//	dgb_printf_safe("app_task_init is running ...\r\n");
 
 	/* 创建用到的任务 */
 	taskDISABLE_INTERRUPTS();
@@ -131,19 +178,27 @@ static void app_task_init(void *pvParameters)
 	}
 	taskENABLE_INTERRUPTS();
 
+	/* 创建互斥型信号量 */
+	g_mutex_printf = xSemaphoreCreateMutex();
 	/*创建计数型信号量，最大值为10，初值为0*/
-	g_sem_led = xSemaphoreCreateCounting(10, 0);
-	g_sem_beep = xSemaphoreCreateCounting(10, 0);
+	g_sem_led = xSemaphoreCreateCounting(20, 0);
+	g_sem_beep = xSemaphoreCreateCounting(20, 0);
+	g_sem_motor = xSemaphoreCreateCounting(10, 0);
+
 	/*创建事件标志组*/
 	g_event_group = xEventGroupCreate();
+
 	/*创建消息队列,要注意消息队列的容量是否创建正确*/
-	g_queue_led = xQueueCreate(QUEUE_LED_LEN, sizeof(uint8_t));			  // 用于led通信的消息队列
-	g_queue_beep = xQueueCreate(QUEUE_BEEP_LEN, sizeof(beep_t));		  // 用于beep通信的消息队列
-	g_queue_oled = xQueueCreate(QUEUE_OLED_LEN, sizeof(oled_t));		  // 用于oled通信的消息队列
-	g_queue_usart = xQueueCreate(QUEUE_USART_LEN, sizeof(usart_t));		  // 用于usart通信的消息队列
-	g_queue_flash = xQueueCreate(QUEUE_FLASH_LEN, sizeof(flash_t));		  // 用于flash通信的消息队列
-	g_queue_keyboard = xQueueCreate(QUEUE_KEYBOARD_LEN, sizeof(uint8_t)); // 用于keyboard通信的消息队列
-	g_queue_frm = xQueueCreate(QUEUE_FSM_LEN, sizeof(g_usart1_rx_buf));	  // 用于fr1002通信的消息队列
+	g_queue_led = xQueueCreate(QUEUE_LED_LEN, sizeof(uint8_t));					 // 用于led通信的消息队列
+	g_queue_beep = xQueueCreate(QUEUE_BEEP_LEN, sizeof(beep_t));				 // 用于beep通信的消息队列
+	g_queue_oled = xQueueCreate(QUEUE_OLED_LEN, sizeof(oled_t));				 // 用于oled通信的消息队列
+	g_queue_usart = xQueueCreate(QUEUE_USART_LEN, sizeof(usart_t));				 // 用于usart通信的消息队列
+	g_queue_flash = xQueueCreate(QUEUE_FLASH_LEN, sizeof(flash_t));				 // 用于flash通信的消息队列
+	g_queue_keyboard = xQueueCreate(QUEUE_KEYBOARD_LEN, sizeof(uint8_t));		 // 用于keyboard通信的消息队列
+	g_queue_frm = xQueueCreate(QUEUE_FSM_LEN, sizeof(g_usart1_rx_buf));			 // 用于fr1002通信的消息队列
+	g_queue_motor = xQueueCreate(QUEUE_MOTOR_LEN, sizeof(uint8_t));				 // 用于motor通信的消息队列
+	g_queue_esp8266 = xQueueCreate(QUEUE_ESP8266_LEN, sizeof(g_esp8266_rx_buf)); // 用于esp8266通信的消息队列
+
 	/*实现了复位不重置flash和实时时钟当前日期时间*/
 	if (RTC_ReadBackupRegister(RTC_BKP_DR0) != 4455)
 	{
@@ -166,7 +221,7 @@ static void app_task_init(void *pvParameters)
 	kbd_init();
 	OLED_Init();
 	fpm_init();
-
+	motor_init();
 	OLED_Clear();
 	/* 显示logo */
 	OLED_DrawBMP(0, 0, 128, 8, (uint8_t *)pic_logo);
@@ -176,7 +231,7 @@ static void app_task_init(void *pvParameters)
 
 	/* 删除任务自身 */
 	vTaskDelete(NULL);
-	printf("[app_task_init] nerver run here\r\n");
+	dgb_printf_safe("[app_task_init] nerver run here\r\n");
 }
 
 /*led任务函数*/
@@ -184,7 +239,7 @@ static void app_task_led(void *pvParameters)
 {
 	uint8_t led_sta = 0; // led状态标志位
 	BaseType_t xReturn = pdFALSE;
-	printf("app_task_led is running ...\r\n");
+	dgb_printf_safe("[app_task_led] is running ...\r\n");
 	for (;;) // while(1)
 	{
 		xReturn = xQueueReceive(g_queue_led,	/* 消息队列的句柄 */
@@ -217,14 +272,14 @@ static void app_task_led(void *pvParameters)
 			else
 				PEout(13) = 1;
 		}
-		/* 检测到控制LED4 10000001(0x81)，灭：10000000(0x80)	*/
-		if (led_sta & 0x80)
-		{
-			if (led_sta & 0x01)
-				PEout(14) = 0;
-			else
-				PEout(14) = 1;
-		}
+		// /* 检测到控制LED4 10000001(0x81)，灭：10000000(0x80)	*/
+		// if (led_sta & 0x80)
+		// {
+		// 	if (led_sta & 0x01)
+		// 		PEout(14) = 0;
+		// 	else
+		// 		PEout(14) = 1;
+		// }
 		/* 释放信号量，告诉对方，当前led控制任务已经完成 */
 		xSemaphoreGive(g_sem_led);
 	}
@@ -234,11 +289,11 @@ void app_task_led_breath(void *pvParameters)
 {
 	int8_t brightness = 0;
 
-	printf("[app_task_led_breath] create success and suspend self\r\n");
+	dgb_printf_safe("[app_task_led_breath] create success and suspend self\r\n");
 
 	vTaskSuspend(NULL); // 先挂起呼吸灯
 
-	printf("[app_task_led_breath] resume success\r\n");
+	dgb_printf_safe("[app_task_led_breath] resume success\r\n");
 
 	for (;;)
 	{
@@ -262,7 +317,7 @@ static void app_task_beep(void *pvParameters)
 {
 	beep_t beep;
 	BaseType_t xReturn;
-	printf("app_task_beep is running ...\r\n");
+	dgb_printf_safe("[app_task_beep] is running ...\r\n");
 	for (;;) // while(1)
 	{
 		xReturn = xQueueReceive(g_queue_beep,	/* 消息队列的句柄 */
@@ -271,17 +326,16 @@ static void app_task_beep(void *pvParameters)
 		// 解析消息队列传递来的信息
 		if (xReturn != pdPASS)
 			continue;
-		// printf("[app_task_beep] beep.sta=%d beep.duration=%d\r\n", beep.sta, beep.duration);
 		// 检查蜂鸣器是否需要持续工作
-		if (beep.duration)
-		{
-			BEEP(beep.sta);
-			while (beep.duration--)
-				vTaskDelay(1);
-			/* 蜂鸣器状态翻转 */
-			beep.sta ^= 1;
-		}
-		BEEP(beep.sta);
+		// if (beep.duration)
+		// {
+		// 	BEEP(beep.sta);
+		// 	while (beep.duration--)
+		// 		vTaskDelay(1);
+		// 	/* 蜂鸣器状态翻转 */
+		// 	beep.sta ^= 1;
+		// }
+		// BEEP(beep.sta);
 		/* 释放信号量，告诉对方，当前beep控制任务已经完成 */
 		xSemaphoreGive(g_sem_beep);
 	}
@@ -294,7 +348,7 @@ static void app_task_key(void *pvParameters)
 	oled_t oled;
 	EventBits_t EventValue;
 	BaseType_t xReturn = pdFALSE;
-	printf("[app_task_key] create success\r\n");
+	dgb_printf_safe("[app_task_key] create success\r\n");
 	for (;;)
 	{
 		// 等待事件组中的相应事件位，或同步
@@ -304,6 +358,7 @@ static void app_task_key(void *pvParameters)
 										 (BaseType_t)pdFALSE,
 										 (TickType_t)portMAX_DELAY);
 		memset(&oled, 0, sizeof(oled));
+
 		// 根据返回值判断哪个按键触发了
 		if (EventValue & EVENT_GROUP_KEY1_DOWN) // 按键1
 		{
@@ -314,11 +369,11 @@ static void app_task_key(void *pvParameters)
 			// 确认是按下
 			if (PAin(0) == 0)
 			{
-				printf("[app_task_key] S1 Press\r\n");
-				vTaskSuspend(app_task_rtc_handle);	// 挂起实时时钟任务
-				vTaskSuspend(app_task_sr04_handle); // 挂起超声波模块
+				dgb_printf_safe("[app_task_key] S1 Press\r\n");
+				vTaskSuspend(app_task_rtc_handle); // 挂起实时时钟任务
+
 				g_rtc_get_what = FLAG_RTC_GET_NONE; // 不显示时间信息
-				flash_read(10);
+
 				// 发送注册指纹事件
 				xEventGroupSetBits(g_event_group, EVENT_GROUP_FPM_ADD);
 			}
@@ -336,15 +391,25 @@ static void app_task_key(void *pvParameters)
 			vTaskDelay(50);
 			if (PEin(2) == 0)
 			{
-				printf("[app_task_key] S2 Press\r\n");
-				vTaskSuspend(app_task_rtc_handle);	// 挂起实时时钟任务
-				vTaskSuspend(app_task_sr04_handle); // 挂起超声波模块
+				dgb_printf_safe("[app_task_key] S2 Press\r\n");
+				vTaskSuspend(app_task_rtc_handle); // 挂起实时时钟任务
 				g_rtc_get_what = FLAG_RTC_GET_NONE; // 	不显示时间信息
+				if (g_unlock_what == FLAG_UNLOCK_NO)
+				{
+					// 发送验证指纹事件
+					xEventGroupSetBits(g_event_group, EVENT_GROUP_FPM_AUTH);
+				}
 
-				// 	// 触发事件标志位0x20,触发温度记录任务
-				// xEventGroupSetBits(g_event_group, EVENT_GROUP_DHT);
-				// 发送验证指纹事件
-				xEventGroupSetBits(g_event_group, EVENT_GROUP_FPM_AUTH);
+				else if (g_unlock_what == FLAG_UNLOCK_OK)
+				{
+					oled.ctrl = OLED_CTRL_CLEAR;
+					xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+										 &oled,		   /* 发送的消息内容 */
+										 100);		   /* 等待时间 100 Tick */
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_dht] xQueueSend oled string error code is %d\r\n", xReturn);
+					g_dht_get_what = !g_dht_get_what; // 切换获取温度状态
+				}
 			}
 			// 等待按键释放
 			while (PEin(2) == 0)
@@ -360,7 +425,8 @@ static void app_task_key(void *pvParameters)
 			vTaskDelay(50);
 			if (PEin(3) == 0)
 			{
-				printf("[app_task_key] S1 Press\r\n");
+				dgb_printf_safe("[app_task_key] S1 Press\r\n");
+
 				g_rtc_get_what = FLAG_RTC_GET_NONE;
 				// 发送显示指纹数量事件
 				xEventGroupSetBits(g_event_group, EVENT_GROUP_FPM_SHOW);
@@ -380,7 +446,7 @@ static void app_task_key(void *pvParameters)
 			vTaskDelay(50);
 			if (PEin(4) == 0)
 			{
-				printf("[app_task_key] S4 Press\r\n");
+				dgb_printf_safe("[app_task_key] S4 Press\r\n");
 				// 发送删除指纹事件
 				xEventGroupSetBits(g_event_group, EVENT_GROUP_FPM_DELETE);
 
@@ -391,7 +457,7 @@ static void app_task_key(void *pvParameters)
 				oled.ctrl = OLED_CTRL_CLEAR; /* oled清屏 */
 				xReturn = xQueueSend(g_queue_oled, &oled, 100);
 				if (xReturn != pdPASS)
-					printf("[app_task_rtc] xQueueSend oled string error code is %d\r\n", xReturn);
+					dgb_printf_safe("[app_task_key] xQueueSend oled string error code is %d\r\n", xReturn);
 			}
 
 			// 等待按键释放
@@ -408,7 +474,7 @@ void app_task_keyboard(void *pvParameters)
 	char key_val = 'N';
 	beep_t beep;
 	BaseType_t xReturn;
-	printf("[app_task_kbd] create success\r\n");
+	dgb_printf_safe("[app_task_kbd] create success\r\n");
 
 	while (1)
 	{
@@ -417,23 +483,23 @@ void app_task_keyboard(void *pvParameters)
 
 		if (key_val != 'N')
 		{
-			printf("[app_task_kbd] kbd press %c \r\n", key_val);
+			dgb_printf_safe("[app_task_kbd] kbd press %c \r\n", key_val);
 
 			xReturn = xQueueSend(g_queue_keyboard, &key_val, 100);
 			if (xReturn != pdPASS)
-				printf("[app_task_kbd] xQueueSend kbd error code is %d\r\n", xReturn);
+				dgb_printf_safe("[app_task_kbd] xQueueSend kbd error code is %d\r\n", xReturn);
 
 			/* 嘀一声示意 */
 			beep.sta = 1;
 			beep.duration = 10;
 			xReturn = xQueueSend(g_queue_beep, &beep, 100);
 			if (xReturn != pdPASS)
-				printf("[app_task_kbd] xQueueSend beep error code is %d\r\n", xReturn);
+				dgb_printf_safe("[app_task_kbd] xQueueSend beep error code is %d\r\n", xReturn);
 
 			/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 			xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 			if (xReturn != pdPASS)
-				printf("[app_task_system_reset] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+				dgb_printf_safe("[app_task_key] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 		}
 	}
 }
@@ -448,9 +514,9 @@ static void app_task_rtc(void *pvParameters)
 	RTC_TimeTypeDef RTC_TimeStructure;
 	RTC_DateTypeDef RTC_DateStructure;
 
-	printf("[app_task_rtc] create success and suspend self\r\n");
+	dgb_printf_safe("[app_task_rtc] create success and suspend self\r\n");
 	vTaskSuspend(app_task_rtc_handle);
-	printf("[app_task_rtc] resume success\r\n");
+	dgb_printf_safe("[app_task_rtc] resume success\r\n");
 
 	for (;;)
 	{
@@ -499,11 +565,11 @@ static void app_task_rtc(void *pvParameters)
 								 &oled,		   /* 发送的消息内容 */
 								 100);		   /* 等待时间 100 Tick */
 			if (xReturn != pdPASS)
-				printf("[app_task_rtc] xQueueSend oled string error code is %d\r\n", xReturn);
+				dgb_printf_safe("[app_task_rtc] xQueueSend oled string error code is %d\r\n", xReturn);
 		}
 		if (EventValue & EVENT_GROUP_RTC_ALARM) // 闹钟被唤醒事件
 		{
-			printf("闹钟唤醒了\r\n");
+			dgb_printf_safe("[app_task_key] 闹钟唤醒了\r\n");
 		}
 	}
 }
@@ -515,7 +581,7 @@ static void app_task_dht(void *pvParameters)
 	int32_t dht11_read_ret;	 // 温湿度读取函数返回值
 	uint8_t g_temp_buf[32];	 // 格式化记录当前温湿度
 	oled_t oled;
-	flash_t flash;
+
 	BaseType_t xReturn;
 	EventBits_t EventValue;
 
@@ -529,54 +595,56 @@ static void app_task_dht(void *pvParameters)
 										 (TickType_t)portMAX_DELAY);
 		if (EventValue & EVENT_GROUP_DHT)
 		{
-			printf("app_task_dht is running ...\r\n");
-			dht11_read_ret = dht11_read(dht11_buf);
-			if (dht11_read_ret == 0)
+			dgb_printf_safe("[app_task_dht] is running ...\r\n");
+			if ((g_unlock_what == FLAG_UNLOCK_OK) && (g_dht_get_what == FLAG_DHT_GET_START))
 			{
-				memset(&oled, 0, sizeof(oled));
-				memset(&flash, 0, sizeof(flash));
-				// 将数据封装成flash存储结构体格式，发送到flash队列
-				flash.mode = MODE_OPEN_LOCK_DHT;
-				sprintf((char *)flash.databuf, "Temp=%d.%d Humi=%d.%d", dht11_buf[2], dht11_buf[3], dht11_buf[0], dht11_buf[1]);
-				xReturn = xQueueSend(g_queue_flash, /* 消息队列的句柄 */
-									 &flash,		/* 发送的消息内容 */
-									 100);			/* 等待时间 100 Tick */
-				if (xReturn != pdPASS)
-					printf("[app_task_dht] xQueueSend flash string error code is %d\r\n", xReturn);
+				// 挂起别的模块
+				vTaskSuspend(app_task_sr04_handle); // 挂起超声波模块
 
-				// 将数据封装成oled格式发送给oled队列
-				sprintf((char *)g_temp_buf, "Temp=%d.%d", dht11_buf[2], dht11_buf[3]);
-				// 发送给g_queue_oled
-				oled.ctrl = OLED_CTRL_SHOW_STRING;
-				oled.x = 32;
-				oled.y = 2;
-				oled.str = g_temp_buf; // 字符串缓冲区首地址
-				oled.font_size = 16;
-				xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
-									 &oled,		   /* 发送的消息内容 */
-									 100);		   /* 等待时间 100 Tick */
-				if (xReturn != pdPASS)
-					printf("[app_task_dht] xQueueSend oled string error code is %d\r\n", xReturn);
-				vTaskDelay(500); // 不加延时后面的数据会覆盖前面的
-				memset(&oled, 0, sizeof(oled));
-				sprintf((char *)g_temp_buf, "Humi=%d.%d", dht11_buf[0], dht11_buf[1]);
-				oled.ctrl = OLED_CTRL_SHOW_STRING;
-				oled.x = 32;
-				oled.y = 6;
-				oled.str = g_temp_buf; // 字符串缓冲区首地址
-				oled.font_size = 16;
-				xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
-									 &oled,		   /* 发送的消息内容 */
-									 100);		   /* 等待时间 100 Tick */
-				if (xReturn != pdPASS)
-					printf("[app_task_dht] xQueueSend oled string error code is %d\r\n", xReturn);
+				dht11_read_ret = dht11_read(dht11_buf);
+
+				if (dht11_read_ret == 0)
+				{
+					memset(&oled, 0, sizeof(oled));
+					g_temp = (float)dht11_buf[2] + (float)dht11_buf[3] / 10;
+					g_humi = (float)dht11_buf[0] + (float)dht11_buf[1] / 10;
+
+					dgb_printf_safe("Temperature=%.1f Humidity=%.1f\r\n", g_temp, g_humi);
+
+					// 将数据封装成oled格式发送给oled队列
+					sprintf((char *)g_temp_buf, "Temp=%d.%d", dht11_buf[2], dht11_buf[3]);
+					// 发送给g_queue_oled
+					oled.ctrl = OLED_CTRL_SHOW_STRING;
+					oled.x = 32;
+					oled.y = 2;
+					oled.str = g_temp_buf; // 字符串缓冲区首地址
+					oled.font_size = 16;
+					xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+										 &oled,		   /* 发送的消息内容 */
+										 100);		   /* 等待时间 100 Tick */
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_dht] xQueueSend oled string error code is %d\r\n", xReturn);
+					vTaskDelay(500); // 不加延时后面的数据会覆盖前面的
+					memset(&oled, 0, sizeof(oled));
+					sprintf((char *)g_temp_buf, "Humi=%d.%d", dht11_buf[0], dht11_buf[1]);
+					oled.ctrl = OLED_CTRL_SHOW_STRING;
+					oled.x = 32;
+					oled.y = 6;
+					oled.str = g_temp_buf; // 字符串缓冲区首地址
+					oled.font_size = 16;
+					xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+										 &oled,		   /* 发送的消息内容 */
+										 100);		   /* 等待时间 100 Tick */
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_dht] xQueueSend oled string error code is %d\r\n", xReturn);
+				}
+				else
+				{
+					dgb_printf_safe("[app_task_dht] dht11 read error code is %d\r\n", dht11_read_ret);
+				}
 			}
-			else
-			{
-				printf("dht11 read error code is %d\r\n", dht11_read_ret);
-			}
+			vTaskResume(app_task_sr04_handle); // 恢复超声波模块
 		}
-		vTaskResume(app_task_sr04_handle); // 恢复超声波模块
 	}
 }
 /*超声波模块*/
@@ -589,8 +657,9 @@ static void app_task_sr04(void *pvParameters)
 	for (;;) // while(1)
 	{
 
-		printf("[app_task_sr04] is running ...\r\n");
+		dgb_printf_safe("[app_task_sr04] is running ...\r\n");
 		distance = sr04_get_distance();
+		dgb_printf_safe("[app_task_sr04] distance = %d\r\n", distance);
 		if (distance > 400)
 		{
 			oled.ctrl = OLED_CTRL_DISPLAY_OFF; /*息屏*/
@@ -598,7 +667,7 @@ static void app_task_sr04(void *pvParameters)
 								 &oled,		   /* 发送的消息内容 */
 								 100);		   /* 等待时间 100 Tick */
 			if (xReturn != pdPASS)
-				printf("[app_task_sr04] xQueueSend oled string error code is %d\r\n", xReturn);
+				dgb_printf_safe("[app_task_sr04] xQueueSend oled string error code is %d\r\n", xReturn);
 		}
 
 		if (distance >= 20 && distance <= 400)
@@ -609,13 +678,13 @@ static void app_task_sr04(void *pvParameters)
 								 &oled,		   /* 发送的消息内容 */
 								 100);		   /* 等待时间 100 Tick */
 			if (xReturn != pdPASS)
-				printf("[app_task_sr04] xQueueSend oled string error code is %d\r\n", xReturn);
+				dgb_printf_safe("[app_task_sr04] xQueueSend oled string error code is %d\r\n", xReturn);
 			if (g_unlock_what == FLAG_UNLOCK_NO) // 设备上锁期间才能进行人脸识别
 			{									 // 发送验证人脸事件
 				xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_AUTH);
 				// 等待人脸识别成功标志
 				/* 等待人脸识别完毕 */
-				printf("[app_task_sr04] xEventGroupSetBits wait...\r\n");
+				dgb_printf_safe("[app_task_sr04] xEventGroupSetBits wait...\r\n");
 				EventValue = xEventGroupWaitBits((EventGroupHandle_t)g_event_group,
 												 (EventBits_t)EVENT_GROUP_FACE_OK | EVENT_GROUP_FACE_AGAIN,
 												 (BaseType_t)pdTRUE,
@@ -629,7 +698,7 @@ static void app_task_sr04(void *pvParameters)
 						distance = sr04_get_distance();
 						if (distance >= 20 && distance <= 400)
 						{
-							printf("[app_task_sr04] 人脸识别成功了,请开门...\r\n");
+							dgb_printf_safe("[app_task_sr04] 人脸识别成功了,请开门...\r\n");
 						}
 						else if (distance > 400)
 							break;
@@ -639,7 +708,7 @@ static void app_task_sr04(void *pvParameters)
 				/*人脸识别失败，重新触发*/
 				if (EventValue & EVENT_GROUP_FACE_AGAIN) // 人脸验证失败或者设备重新上锁
 				{
-					printf("[app_task_sr04] 人脸识别失败再次触发人脸识别...\r\n");
+					dgb_printf_safe("[app_task_sr04] 人脸识别失败再次触发人脸识别...\r\n");
 					delay_ms(500);
 				}
 			}
@@ -653,7 +722,7 @@ static void app_task_oled(void *pvParameters)
 {
 	oled_t oled;
 	BaseType_t xReturn = pdFALSE;
-	printf("[app_task_oled] create success\r\n");
+	dgb_printf_safe("[app_task_oled] create success\r\n");
 	memset(&oled, 0, sizeof(oled));
 	for (;;)
 	{
@@ -723,7 +792,7 @@ static void app_task_oled(void *pvParameters)
 		break;
 
 		default:
-			printf("[app_task_oled] oled ctrl code is invalid\r\n");
+			dgb_printf_safe("[app_task_oled] oled ctrl code is invalid\r\n");
 			break;
 		}
 	}
@@ -735,7 +804,7 @@ static void app_task_flash(void *pvParameters)
 	BaseType_t xReturn = pdFALSE;
 	RTC_DateTypeDef RTC_Date;
 	RTC_TimeTypeDef RTC_Time;
-	printf("[app_task_flash] create success\r\n");
+	dgb_printf_safe("[app_task_flash] create success\r\n");
 	for (;;)
 	{
 		xReturn = xQueueReceive(g_queue_flash,	  /* 消息队列的句柄 */
@@ -744,11 +813,11 @@ static void app_task_flash(void *pvParameters)
 		if (xReturn != pdPASS)
 			continue;
 
-		printf("[app_task_flash] wait get data\r\n");
+		dgb_printf_safe("[app_task_flash] wait get data\r\n");
 
 		// 获取当前扇区写入块标识
 		flash_write_buf.offset = flash_read_offset((uint32_t *)(0x08010000));
-		if (flash_write_buf.offset >= 10)
+		if (flash_write_buf.offset >= 20)
 		{
 			flash_init();				// 清空数据
 			flash_write_buf.offset = 0; // 从0开始重新写入
@@ -757,14 +826,14 @@ static void app_task_flash(void *pvParameters)
 		RTC_GetDate(RTC_Format_BCD, &RTC_Date);
 		RTC_GetTime(RTC_Format_BCD, &RTC_Time);
 
-		printf("当前时间:20%02x/%02x/%02x %02x:%02x:%02x %d\n",
-			   RTC_Date.RTC_Year,
-			   RTC_Date.RTC_Month,
-			   RTC_Date.RTC_Date,
-			   RTC_Time.RTC_Hours,
-			   RTC_Time.RTC_Minutes,
-			   RTC_Time.RTC_Seconds,
-			   flash_write_buf.mode);
+		dgb_printf_safe("[app_task_flash] 当前时间:20%02x/%02x/%02x %02x:%02x:%02x %d\n",
+						RTC_Date.RTC_Year,
+						RTC_Date.RTC_Month,
+						RTC_Date.RTC_Date,
+						RTC_Time.RTC_Hours,
+						RTC_Time.RTC_Minutes,
+						RTC_Time.RTC_Seconds,
+						flash_write_buf.mode);
 
 		// 记录下每次写入数据的日期时间
 		flash_write_buf.date[0] = RTC_Date.RTC_Year;
@@ -801,40 +870,43 @@ static void app_task_usart(void *pvParameters)
 	RTC_TimeTypeDef RTC_TimeStructure;
 	RTC_DateTypeDef RTC_DateStructure;
 
-	printf("[app_task_usart] create success\r\n");
+	dgb_printf_safe("[app_task_usart] create success\r\n");
 	for (;;)
 	{
+		dgb_printf_safe("[app_task_usart] wait info ...\r\n");
 		// 消息队列为空的时候会阻塞，不需要用事件标志组触发任务
 		xReturn = xQueueReceive(g_queue_usart,	/* 消息队列的句柄 */
 								&usart_packet,	/* 得到的消息内容 */
 								portMAX_DELAY); /* 等待时间一直等 */
 		if (xReturn != pdPASS)
 		{
-			printf("[app_task_usart] xQueueReceive usart_packet error code is %d\r\n", xReturn);
+			dgb_printf_safe("[app_task_usart] xQueueReceive usart_packet error code is %d\r\n", xReturn);
 			continue;
 		}
 		// 解析消息
-		printf("[app_task_usart] recv data:%s\r\n", usart_packet.rx_buf);
+		dgb_printf_safe("[app_task_usart] recv data:%s\r\n", usart_packet.rx_buf);
 
-		// 启动温湿度数据记录模式
-		if (strstr((char *)usart_packet.rx_buf, "temp?#") || strstr((char *)usart_packet.rx_buf, "start"))
+		// 获取当前温湿度
+		if (strstr((char *)usart_packet.rx_buf, "TEMP?#"))
 		{
+			// 触发事件标志位0x20,触发温度记录任务
+			xEventGroupSetBits(g_event_group, EVENT_GROUP_DHT);
 		}
 		if (strstr((char *)usart_packet.rx_buf, "ALARM SET")) // 设置闹钟：日-时-分-秒
 		{
 			// 截取 日-时-分-秒
 			p = strtok((char *)usart_packet.rx_buf, "-");
-			// printf("p:%s\r\n",p);
+			// dgb_printf_safe("p:%s\r\n",p);
 			date = to_hex(atoi(strtok(NULL, "-")));
-			// printf("date:%d\r\n",date);
+			// dgb_printf_safe("date:%d\r\n",date);
 			hours = to_hex(atoi(strtok(NULL, "-")));
-			// printf("hours:%d\r\n",hours);
+			// dgb_printf_safe("hours:%d\r\n",hours);
 			minutes = to_hex(atoi(strtok(NULL, "-")));
-			// printf("minutes:%d\r\n",minutes);
+			// dgb_printf_safe("minutes:%d\r\n",minutes);
 			seconds = to_hex(atoi(strtok(NULL, "#")));
-			// printf("seconds:%d\r\n",seconds);
+			// dgb_printf_safe("seconds:%d\r\n",seconds);
 			rtc_alarm_init(hours, minutes, seconds, date); // 设置
-			printf("[app_task_usart] rtc set alarm ok\r\n");
+			dgb_printf_safe("[app_task_usart] rtc set alarm ok\r\n");
 		}
 
 		/* 设置日期 */
@@ -857,7 +929,7 @@ static void app_task_usart(void *pvParameters)
 			RTC_DateStructure.RTC_WeekDay = week;
 			// 设置
 			RTC_SetDate(RTC_Format_BCD, &RTC_DateStructure);
-			printf("[app_task_usart] rtc set date ok\r\n");
+			dgb_printf_safe("[app_task_usart] rtc set date ok\r\n");
 		}
 		/* 设置时间 */
 		else if (strstr((char *)usart_packet.rx_buf, "TIME SET"))
@@ -886,12 +958,12 @@ static void app_task_usart(void *pvParameters)
 			/* 设置RTC时间 */
 			RTC_SetTime(RTC_Format_BCD, &RTC_TimeStructure);
 
-			printf("[app_task_usart] rtc set time ok\r\n");
+			dgb_printf_safe("[app_task_usart] rtc set time ok\r\n");
 		}
 		else if (strstr((char *)usart_packet.rx_buf, "PASS UNLOCK") && (g_pass_man_what == FLAG_PASS_MAN_AUTH)) // 验证密码
 		{
 			p = strtok((char *)usart_packet.rx_buf, "PASS UNLOCK");
-			printf("[app_task_usart] recv pass :%s\r\n", p);
+			dgb_printf_safe("[app_task_usart] recv pass :%s\r\n", p);
 			g_pass_unlock_mode = MODE_OPEN_LOCK_BLUE; // 蓝牙解锁模式
 			for (i = 0; i < 8; i++)
 			{
@@ -900,8 +972,12 @@ static void app_task_usart(void *pvParameters)
 									 &key_val,		   /* 发送的消息内容 */
 									 100);			   /* 等待时间 100 Tick */
 				if (xReturn != pdPASS)
-					printf("[app_task_kbd] xQueueSend kbd error code is %d\r\n", xReturn);
+					dgb_printf_safe("[app_task_usart] xQueueSend kbd error code is %d\r\n", xReturn);
 			}
+		}
+		if (strstr((char *)usart_packet.rx_buf, "LOG"))
+		{
+			flash_read(20);
 		}
 	}
 }
@@ -919,7 +995,7 @@ void app_task_password_man(void *pvParameters)
 	const uint8_t x_start = 36;
 	const uint8_t y_start = 4;
 	uint8_t x = x_start, y = y_start;
-
+	uint8_t motor;
 	oled_t oled;
 	beep_t beep;
 	flash_t flash;
@@ -948,13 +1024,11 @@ void app_task_password_man(void *pvParameters)
 			xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_DELETE);
 		}
 
-		if (key_val == 'C')
+		if (key_val == 'C') // 关锁
 		{
-			printf("password reset\r\n");
-			g_unlock_what = FLAG_UNLOCK_NO;		  // 设备上锁
-			g_pass_man_what = FLAG_PASS_MAN_AUTH; // 开始密码验证
+			dgb_printf_safe("[app_task_pass_man] password reset\r\n");
 
-			xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_AGAIN); // 发送设备上锁从新验证人脸事件
+			g_pass_man_what = FLAG_PASS_MAN_AUTH; // 开始密码验证
 			/*恢复初值*/
 			x = x_start;
 			y = y_start;
@@ -966,7 +1040,7 @@ void app_task_password_man(void *pvParameters)
 								 &oled,		   /* 发送的消息内容 */
 								 100);		   /* 等待时间 100 Tick */
 			if (xReturn != pdPASS)
-				printf("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
+				dgb_printf_safe("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
 			oled.ctrl = OLED_CTRL_SHOW_STRING;
 			oled.x = x;
 			oled.y = y;
@@ -976,7 +1050,23 @@ void app_task_password_man(void *pvParameters)
 								 &oled,		   /* 发送的消息内容 */
 								 100);		   /* 等待时间 100 Tick */
 			if (xReturn != pdPASS)
-				printf("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
+				dgb_printf_safe("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
+
+			if (g_unlock_what == FLAG_UNLOCK_OK) // 设备解锁状态才能关锁
+			{
+				g_unlock_what = FLAG_UNLOCK_NO; // 设备上锁
+
+				motor = MOTOR_DOUBLE_REV;
+				xReturn = xQueueSend(g_queue_motor, &motor, 100);
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_pass_man] xQueueSend motor error code is %d\r\n", xReturn);
+				/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+				xReturn = xSemaphoreTake(g_sem_motor, portMAX_DELAY);
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_pass_man] xSemaphoreTake g_sem_motor error code is %d\r\n", xReturn);
+
+				xEventGroupSetBits(g_event_group, EVENT_GROUP_FACE_AGAIN); // 发送设备上锁从新验证人脸事件
+			}
 
 			continue;
 		}
@@ -1001,7 +1091,7 @@ void app_task_password_man(void *pvParameters)
 									 &oled,		   /* 发送的消息内容 */
 									 100);		   /* 等待时间 100 Tick */
 				if (xReturn != pdPASS)
-					printf("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
+					dgb_printf_safe("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
 				continue;
 			}
 
@@ -1018,7 +1108,7 @@ void app_task_password_man(void *pvParameters)
 									 &oled,		   /* 发送的消息内容 */
 									 100);		   /* 等待时间 100 Tick */
 				if (xReturn != pdPASS)
-					printf("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
+					dgb_printf_safe("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
 
 				vTaskDelay(100);
 				/* 显示* */
@@ -1027,14 +1117,14 @@ void app_task_password_man(void *pvParameters)
 									 &oled,		   /* 发送的消息内容 */
 									 100);		   /* 等待时间 100 Tick */
 				if (xReturn != pdPASS)
-					printf("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
+					dgb_printf_safe("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
 
 				x += 8;
 				key_cnt++;
 			}
 			else if (key_val == '#' && key_cnt >= 6)
 			{
-				printf("[app_task_pass_man] auth key buf is %6s\r\n", key_buf);
+				dgb_printf_safe("[app_task_pass_man] auth key buf is %6s\r\n", key_buf);
 
 				/* 读取eeprom存储的密码 */
 				// at24c02_read(PASS1_ADDR_IN_EEPROM, (uint8_t *)pass_auth_eeprom, PASS_LEN);
@@ -1044,7 +1134,7 @@ void app_task_password_man(void *pvParameters)
 				/* 密码匹配成功 */
 				if (rt == 0)
 				{
-					printf("[app_task_pass_man] password auth success\r\n");
+					dgb_printf_safe("[app_task_pass_man] password auth success\r\n");
 					g_unlock_what = FLAG_UNLOCK_OK;		  // 设备解锁
 					g_pass_man_what = FLAG_PASS_MAN_NONE; // 不再进行密码验证
 					/* 设置要显示的图片-表情（成功） */
@@ -1059,7 +1149,7 @@ void app_task_password_man(void *pvParameters)
 										 &oled,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend oled picture error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_pass_man] xQueueSend oled picture error code is %d\r\n", xReturn);
 
 					/* 嘀一声示意:第一次 */
 					beep.sta = 1;
@@ -1068,11 +1158,11 @@ void app_task_password_man(void *pvParameters)
 										 &beep,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
 					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 					vTaskDelay(100);
 					/* 嘀一声示意:第二次 */
 					beep.sta = 1;
@@ -1081,11 +1171,21 @@ void app_task_password_man(void *pvParameters)
 										 &beep,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
 					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+
+					motor = MOTOR_DOUBLE_POS;
+					xReturn = xQueueSend(g_queue_motor, &motor, 100);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_pass_man] xQueueSend motor error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_motor, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_pass_man] xSemaphoreTake g_sem_motor error code is %d\r\n", xReturn);
+
 					/* 延时一会 */
 					vTaskDelay(2000);
 					/* 恢复初值 */
@@ -1098,11 +1198,11 @@ void app_task_password_man(void *pvParameters)
 					flash.mode = g_pass_unlock_mode; // 获取当前解锁模式，有蓝牙解锁、键盘解锁，存入flash
 					xReturn = xQueueSend(g_queue_flash, &flash, 100);
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend flash error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_pass_man] xQueueSend flash error code is %d\r\n", xReturn);
 				}
 				else
 				{
-					printf("[app_task_pass_man] password auth fail\r\n");
+					dgb_printf_safe("[app_task_pass_man] password auth fail\r\n");
 					g_pass_man_what = FLAG_PASS_MAN_NONE; // 回到锁屏界面，等待下一次解锁
 					/* 设置要显示的图片-表情（失败） */
 					oled.x = 32;
@@ -1116,7 +1216,7 @@ void app_task_password_man(void *pvParameters)
 										 &oled,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend oled picture error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_pass_man] xQueueSend oled picture error code is %d\r\n", xReturn);
 
 					/* 长鸣1秒示意 */
 					beep.sta = 1;
@@ -1125,12 +1225,12 @@ void app_task_password_man(void *pvParameters)
 										 &beep,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
 
 					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 
 					/* 延时一会 */
 					vTaskDelay(2000);
@@ -1149,10 +1249,14 @@ void app_task_password_man(void *pvParameters)
 										 &oled,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
 				}
 				g_pass_unlock_mode = MODE_OPEN_LOCK_KEYBOARD; // 恢复默认解锁方式
 			}
+		}
+
+		if (g_pass_man_what == FLAG_PASS_MAN_MODIFY) // 密码修改模式
+		{
 		}
 	}
 }
@@ -1162,12 +1266,13 @@ void app_task_fpm383(void *pvParameters)
 	uint8_t fmp_error_code;
 	uint16_t id;
 	uint16_t id_total;
+	uint8_t motor;
 	beep_t beep;
 	oled_t oled;
 	flash_t flash;
 	EventBits_t EventValue;
 	BaseType_t xReturn = pdFALSE;
-	printf("[app_task_fpm383] create success\r\n");
+	dgb_printf_safe("[app_task_fpm383] create success\r\n");
 	for (;;)
 	{
 		// 等待事件组中的相应事件位，或同步
@@ -1177,19 +1282,22 @@ void app_task_fpm383(void *pvParameters)
 										 (BaseType_t)pdFALSE,
 										 (TickType_t)portMAX_DELAY);
 
+		vTaskSuspend(app_task_sr04_handle); // 挂起超声波模块
+		vTaskSuspend(app_task_dht_handle);	// 挂起温湿度模块
+
 		if (g_unlock_what == FLAG_UNLOCK_NO) // 设备上锁后才能解锁
 		{
 			if (EventValue & EVENT_GROUP_FPM_AUTH) // 验证指纹事件
 			{
 				fpm_ctrl_led(FPM_LED_BLUE);
-				printf("[app_task_fpm383] 执行刷指纹操作,请将手指放到指纹模块触摸感应区\r\n");
+				dgb_printf_safe("[app_task_fpm383] 执行刷指纹操作,请将手指放到指纹模块触摸感应区\r\n");
 				/* 参数为0xFFFF进行1:N匹配 */
 				id = 0xFFFF;
 				fmp_error_code = fpm_idenify_auto(&id);
 				if (fmp_error_code == 0)
 				{
 					fpm_ctrl_led(FPM_LED_GREEN);
-					printf("[app_task_fpm383] password auth success the fingerprint is %04d\r\n", id);
+					dgb_printf_safe("[app_task_fpm383] password auth success the fingerprint is %04d\r\n", id);
 
 					g_unlock_what = FLAG_UNLOCK_OK;			 // 设备解锁
 					g_pass_man_what = FLAG_PASS_MAN_NONE;	 // 解锁成功关闭键盘解锁蓝牙解锁
@@ -1199,11 +1307,21 @@ void app_task_fpm383(void *pvParameters)
 					beep.duration = 50;
 					xReturn = xQueueSend(g_queue_beep, &beep, 100);
 					if (xReturn != pdPASS)
-						printf("[app_task_fpm383] xQueueSend beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xQueueSend beep error code is %d\r\n", xReturn);
 					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 					if (xReturn != pdPASS)
-						printf("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+
+					motor = MOTOR_DOUBLE_POS;
+					xReturn = xQueueSend(g_queue_motor, &motor, 100);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_fpm383] xQueueSend motor error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_motor, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_fpm383] xSemaphoreTake g_sem_motor error code is %d\r\n", xReturn);
+
 					/* 设置要显示的图片-表情（成功） */
 					oled.x = 32;
 					oled.y = 0;
@@ -1216,17 +1334,17 @@ void app_task_fpm383(void *pvParameters)
 										 &oled,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_fpm383] xQueueSend oled picture error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xQueueSend oled picture error code is %d\r\n", xReturn);
 					//  发送flash消息记录解锁日志
 					flash.mode = g_pass_unlock_mode; // 获取当前解锁模式，存入flash
 					xReturn = xQueueSend(g_queue_flash, &flash, 100);
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend flash error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xQueueSend flash error code is %d\r\n", xReturn);
 				}
 				else
 				{
 					fpm_ctrl_led(FPM_LED_RED);
-					printf("[app_task_pass_man] password auth fail\r\n");
+					dgb_printf_safe("[app_task_fpm383] password auth fail\r\n");
 					/* 设置要显示的图片-表情（失败） */
 					oled.x = 32;
 					oled.y = 0;
@@ -1239,7 +1357,7 @@ void app_task_fpm383(void *pvParameters)
 										 &oled,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend oled picture error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xQueueSend oled picture error code is %d\r\n", xReturn);
 
 					/* 长鸣1秒示意 */
 					beep.sta = 1;
@@ -1248,12 +1366,12 @@ void app_task_fpm383(void *pvParameters)
 										 &beep,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xQueueSend beep error code is %d\r\n", xReturn);
 
 					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 					/* 延时一会 */
 					vTaskDelay(2000);
 					/* 显示锁屏界面 */
@@ -1267,7 +1385,7 @@ void app_task_fpm383(void *pvParameters)
 										 &oled,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xQueueSend oled string error code is %d\r\n", xReturn);
 					g_pass_man_what = FLAG_PASS_MAN_NONE; // 回到锁屏界面，等待下一次解锁
 				}
 				g_pass_unlock_mode = MODE_OPEN_LOCK_KEYBOARD; // 恢复默认解锁方式
@@ -1283,27 +1401,27 @@ void app_task_fpm383(void *pvParameters)
 			if (EventValue & EVENT_GROUP_FPM_ADD)
 			{
 				fpm_ctrl_led(FPM_LED_BLUE);
-				printf("[app_task_fpm383] 执行添加指纹操作,请将手指放到指纹模块触摸感应区\r\n");
+				dgb_printf_safe("[app_task_fpm383] 执行添加指纹操作,请将手指放到指纹模块触摸感应区\r\n");
 				fmp_error_code = fpm_id_total(&id_total);
 
 				if (fmp_error_code == 0)
 				{
-					printf("[app_task_fpm383] 获取指纹总数：%04d\r\n", id_total);
+					dgb_printf_safe("[app_task_fpm383] 获取指纹总数：%04d\r\n", id_total);
 					/* 添加指纹*/
 					fmp_error_code = fpm_enroll_auto(id_total + 1);
 					if (fmp_error_code == 0)
 					{
 						fpm_ctrl_led(FPM_LED_GREEN);
-						printf("[app_task_fpm383] 自动注册指纹成功\r\n");
+						dgb_printf_safe("[app_task_fpm383] 自动注册指纹成功\r\n");
 						beep.sta = 1;
 						beep.duration = 50;
 						xReturn = xQueueSend(g_queue_beep, &beep, 100);
 						if (xReturn != pdPASS)
-							printf("[app_task_fpm383] xQueueSend  beep error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fpm383] xQueueSend  beep error code is %d\r\n", xReturn);
 						/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 						xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 						if (xReturn != pdPASS)
-							printf("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 					}
 					else
 					{
@@ -1322,16 +1440,16 @@ void app_task_fpm383(void *pvParameters)
 				if (fmp_error_code == 0)
 				{
 					fpm_ctrl_led(FPM_LED_GREEN);
-					printf("[app_task_fpm383] 清空指纹成功\r\n");
+					dgb_printf_safe("[app_task_fpm383] 清空指纹成功\r\n");
 					beep.sta = 1;
 					beep.duration = 50;
 					xReturn = xQueueSend(g_queue_beep, &beep, 100);
 					if (xReturn != pdPASS)
-						printf("[app_task_fpm383] xQueueSend beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xQueueSend beep error code is %d\r\n", xReturn);
 					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 					if (xReturn != pdPASS)
-						printf("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 				}
 				else
 				{
@@ -1340,6 +1458,8 @@ void app_task_fpm383(void *pvParameters)
 				delay_ms(100);
 				fpm_sleep();
 				delay_ms(1000);
+				vTaskResume(app_task_sr04_handle); // 恢复超声波模块
+				vTaskResume(app_task_dht_handle);  // 恢复温湿度模块
 			}
 			// 显示指纹数量事件
 			if (EventValue & EVENT_GROUP_FPM_SHOW)
@@ -1350,16 +1470,16 @@ void app_task_fpm383(void *pvParameters)
 				if (fmp_error_code == 0)
 				{
 					fpm_ctrl_led(FPM_LED_GREEN);
-					printf("[app_task_fpm383] 获取指纹总数：%04d\r\n", id_total);
+					dgb_printf_safe("[app_task_fpm383] 获取指纹总数：%04d\r\n", id_total);
 					beep.sta = 1;
 					beep.duration = 50;
 					xReturn = xQueueSend(g_queue_beep, &beep, 100);
 					if (xReturn != pdPASS)
-						printf("[app_task_fpm383] xQueueSend beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xQueueSend beep error code is %d\r\n", xReturn);
 					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 					if (xReturn != pdPASS)
-						printf("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 				}
 				else
 				{
@@ -1371,6 +1491,7 @@ void app_task_fpm383(void *pvParameters)
 			}
 		}
 		vTaskResume(app_task_sr04_handle); // 恢复超声波模块
+		vTaskResume(app_task_dht_handle);  // 恢复温湿度模块
 	}
 }
 /*人脸识别模块*/
@@ -1385,15 +1506,13 @@ void app_task_fr1002(void *pvParameters)
 	flash_t flash;
 	EventBits_t EventValue;
 	BaseType_t xReturn = pdFALSE;
-	printf("[app_task_fr1002] create success\r\n");
-
+	dgb_printf_safe("[app_task_fr1002] create success\r\n");
 	while (fr_init(115200) != 0)
 	{
 		delay_ms(1000);
-
-		printf("[app_task_init] 3D人脸识别模块连接中 ...\r\n");
+		dgb_printf_safe("[app_task_fr1002] 3D人脸识别模块连接中 ...\r\n");
 	}
-	printf("[app_task_init] 3D人脸识别模块已连接上\r\n");
+	dgb_printf_safe("[app_task_fr1002] 3D人脸识别模块已连接上\r\n");
 
 	for (;;)
 	{
@@ -1404,16 +1523,16 @@ void app_task_fr1002(void *pvParameters)
 										 (BaseType_t)pdFALSE,
 										 (TickType_t)portMAX_DELAY);
 
-		printf("[app_task_fr1002] is running...\r\n");
+		dgb_printf_safe("[app_task_fr1002] is running...\r\n");
 		if (g_unlock_what == FLAG_UNLOCK_NO) // 设备上锁后才能解锁
 		{
 			if (EventValue & EVENT_GROUP_FACE_AUTH)
 			{
-				printf("[ap_task_fr1002] 执行验证人脸操作\r\n");
+				dgb_printf_safe("[ap_task_fr1002] 执行验证人脸操作\r\n");
 				memset(buf, 0, sizeof buf);
 				if (0 == fr_match(buf))
 				{
-					printf("[app_task_fr1002] 人脸匹配成功!\r\n");
+					dgb_printf_safe("[app_task_fr1002] 人脸匹配成功!\r\n");
 					// 发送验证人脸成功事件
 					if (g_unlock_what == FLAG_UNLOCK_NO)
 					{
@@ -1433,7 +1552,7 @@ void app_task_fr1002(void *pvParameters)
 											 &oled,		   /* 发送的消息内容 */
 											 100);		   /* 等待时间 100 Tick */
 						if (xReturn != pdPASS)
-							printf("[app_task_pass_man] xQueueSend oled picture error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fr1002] xQueueSend oled picture error code is %d\r\n", xReturn);
 
 						/* 嘀一声示意:第一次 */
 						beep.sta = 1;
@@ -1442,11 +1561,11 @@ void app_task_fr1002(void *pvParameters)
 											 &beep,		   /* 发送的消息内容 */
 											 100);		   /* 等待时间 100 Tick */
 						if (xReturn != pdPASS)
-							printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fr1002] xQueueSend beep error code is %d\r\n", xReturn);
 						/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 						xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 						if (xReturn != pdPASS)
-							printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fr1002] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 						vTaskDelay(100);
 						/* 嘀一声示意:第二次 */
 						beep.sta = 1;
@@ -1455,23 +1574,23 @@ void app_task_fr1002(void *pvParameters)
 											 &beep,		   /* 发送的消息内容 */
 											 100);		   /* 等待时间 100 Tick */
 						if (xReturn != pdPASS)
-							printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fr1002] xQueueSend beep error code is %d\r\n", xReturn);
 						/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 						xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 						if (xReturn != pdPASS)
-							printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fr1002] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 						/* 延时一会 */
 						vTaskDelay(2000);
 						//  发送flash消息记录解锁日志
 						flash.mode = g_pass_unlock_mode; // 获取当前解锁模式，有蓝牙解锁、键盘解锁，存入flash
 						xReturn = xQueueSend(g_queue_flash, &flash, 100);
 						if (xReturn != pdPASS)
-							printf("[app_task_pass_man] xQueueSend flash error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fr1002] xQueueSend flash error code is %d\r\n", xReturn);
 					}
 				}
 				else
 				{
-					printf("[app_task_fr1002] 人脸匹配失败!\r\n");
+					dgb_printf_safe("[app_task_fr1002] 人脸匹配失败!\r\n");
 					// 发送验证人脸失败并需要再次验证事件
 					if (g_unlock_what == FLAG_UNLOCK_NO)
 					{
@@ -1489,7 +1608,7 @@ void app_task_fr1002(void *pvParameters)
 											 &oled,		   /* 发送的消息内容 */
 											 100);		   /* 等待时间 100 Tick */
 						if (xReturn != pdPASS)
-							printf("[app_task_pass_man] xQueueSend oled picture error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fr1002] xQueueSend oled picture error code is %d\r\n", xReturn);
 
 						/* 长鸣1秒示意 */
 						beep.sta = 1;
@@ -1498,12 +1617,12 @@ void app_task_fr1002(void *pvParameters)
 											 &beep,		   /* 发送的消息内容 */
 											 100);		   /* 等待时间 100 Tick */
 						if (xReturn != pdPASS)
-							printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fr1002] xQueueSend beep error code is %d\r\n", xReturn);
 
 						/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 						xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 						if (xReturn != pdPASS)
-							printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fr1002] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 						/* 延时一会 */
 						vTaskDelay(2000);
 						/* 显示锁屏界面 */
@@ -1517,7 +1636,7 @@ void app_task_fr1002(void *pvParameters)
 											 &oled,		   /* 发送的消息内容 */
 											 100);		   /* 等待时间 100 Tick */
 						if (xReturn != pdPASS)
-							printf("[app_task_pass_man] xQueueSend oled string error code is %d\r\n", xReturn);
+							dgb_printf_safe("[app_task_fr1002] xQueueSend oled string error code is %d\r\n", xReturn);
 					}
 				}
 				delay_ms(500);
@@ -1532,10 +1651,10 @@ void app_task_fr1002(void *pvParameters)
 		{
 			if (EventValue & EVENT_GROUP_FACE_ADD) // 添加人脸
 			{
-				printf("[ap_task_fr1002] 执行添加人脸操作\r\n");
+				dgb_printf_safe("[ap_task_fr1002] 执行添加人脸操作\r\n");
 				if (0 == fr_reg_user("twen"))
 				{
-					printf("[app_task_fr1002] 注册用户成功!\r\n");
+					dgb_printf_safe("[app_task_fr1002] 注册用户成功!\r\n");
 					/* 嘀一声示意:第一次 */
 					beep.sta = 1;
 					beep.duration = 50;
@@ -1543,11 +1662,11 @@ void app_task_fr1002(void *pvParameters)
 										 &beep,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fr1002] xQueueSend beep error code is %d\r\n", xReturn);
 					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fr1002] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 					/* 嘀一声示意:第二次 */
 					beep.sta = 1;
 					beep.duration = 50;
@@ -1555,15 +1674,15 @@ void app_task_fr1002(void *pvParameters)
 										 &beep,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fr1002] xQueueSend beep error code is %d\r\n", xReturn);
 					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fr1002] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 				}
 				else
 				{
-					printf("[app_task_fr1002] 注册用户失败!\r\n");
+					dgb_printf_safe("[app_task_fr1002] 注册用户失败!\r\n");
 					/* 嘀一声示意	*/
 					beep.sta = 1;
 					beep.duration = 50;
@@ -1571,11 +1690,11 @@ void app_task_fr1002(void *pvParameters)
 										 &beep,		   /* 发送的消息内容 */
 										 100);		   /* 等待时间 100 Tick */
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xQueueSend beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fr1002] xQueueSend beep error code is %d\r\n", xReturn);
 					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
 					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
 					if (xReturn != pdPASS)
-						printf("[app_task_pass_man] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+						dgb_printf_safe("[app_task_fr1002] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 				}
 				delay_ms(500);
 				/* 进入掉电模式 */
@@ -1589,11 +1708,11 @@ void app_task_fr1002(void *pvParameters)
 
 				if (user_total < 0)
 				{
-					printf("[app_task_fr1002] 获取已注册的用户总数失败!\r\n");
+					dgb_printf_safe("[app_task_fr1002] 获取已注册的用户总数失败!\r\n");
 				}
 				else
 				{
-					printf("[app_task_fr1002] 获取已注册的用户总数:%d\r\n", user_total);
+					dgb_printf_safe("[app_task_fr1002] 获取已注册的用户总数:%d\r\n", user_total);
 				}
 				delay_ms(500);
 				/* 进入掉电模式 */
@@ -1605,12 +1724,12 @@ void app_task_fr1002(void *pvParameters)
 			{
 				if (0 == fr_del_user_all())
 				{
-					printf("[app_task_fr1002] 删除所有用户成功!\r\n");
+					dgb_printf_safe("[app_task_fr1002] 删除所有用户成功!\r\n");
 					// beep_on();delay_ms(100);beep_off();
 				}
 				else
 				{
-					printf("[app_task_fr1002] 删除所有用户失败!\r\n");
+					dgb_printf_safe("[app_task_fr1002] 删除所有用户失败!\r\n");
 				}
 				delay_ms(500);
 				/* 进入掉电模式 */
@@ -1621,6 +1740,251 @@ void app_task_fr1002(void *pvParameters)
 	}
 }
 
+/*步进电机模块*/
+void app_task_motor(void *pvParameters)
+{
+	uint8_t motor;
+	BaseType_t xReturn;
+	for (;;)
+	{
+		xReturn = xQueueReceive(g_queue_motor, &motor, portMAX_DELAY);
+		if (xReturn != pdPASS)
+		{
+			dgb_printf_safe("[app_task_motor] xQueueReceive usart_packet error code is %d\r\n", xReturn);
+			continue;
+		}
+		if (motor == MOTOR_DOUBLE_POS)
+		{
+			motor_corotation_double_pos();
+		}
+		if (motor == MOTOR_DOUBLE_REV)
+		{
+			motor_corotation_double_rev();
+		}
+		xSemaphoreGive(g_sem_motor);
+		delay_ms(5000);
+	}
+}
+
+/*MQTT模块*/
+void app_task_mqtt(void *pvParameters)
+{
+	uint32_t delay_1s_cnt = 0;
+	uint8_t buf[5] = {20, 05, 56, 8, 20};
+
+	dgb_printf_safe("[app_task_mqtt] create success\r\n");
+
+	dgb_printf_safe("[app_task_mqtt] suspend\r\n");
+
+	vTaskSuspend(NULL); // 挂起自己，等待esp8266初始化完成将自己恢复
+
+	dgb_printf_safe("[app_task_mqtt] resume\r\n");
+
+	vTaskDelay(1000);
+
+	for (;;)
+	{
+		// 发送心跳包
+		mqtt_send_heart();
+
+		// 上报设备状态
+		mqtt_report_devices_status();
+
+		delay_ms(1000);
+
+		delay_1s_cnt++;
+
+		if (delay_1s_cnt >= 6) // 每6s触发一次温湿度记录事件
+		{
+			delay_1s_cnt = 0;
+			// 触发事件标志位0x20,触发温度记录任务
+			xEventGroupSetBits(g_event_group, EVENT_GROUP_DHT);
+		}
+	}
+}
+/*管理mqtt和esp8266函数，当esp8266在一定时间内没有接收数据（可以换成定时器？满足条件触发一个事件），就将接收到的数据发送到esp8266消息队列，由esp8266任务函数解析处理，*/
+void app_task_monitor(void *pvParameters)
+{
+	uint32_t esp8266_rx_cnt = 0;
+
+	BaseType_t xReturn = pdFALSE;
+
+	dgb_printf_safe("[app_task_monitor] create success \r\n");
+
+	for (;;)
+	{
+		esp8266_rx_cnt = g_esp8266_rx_cnt;
+
+		delay_ms(10);
+
+		/* n毫秒后，发现g_esp8266_rx_cnt没有变化，则认为接收数据结束 */
+		if (g_esp8266_init && esp8266_rx_cnt && (esp8266_rx_cnt == g_esp8266_rx_cnt))
+		{
+			/* 发送消息，如果队列满了，超时时间为1000个节拍，如果1000个节拍都发送失败，函数直接返回 */
+			xReturn = xQueueSend(g_queue_esp8266, (void *)g_esp8266_rx_buf, 1000);
+
+			if (xReturn != pdPASS)
+				dgb_printf_safe("[app_task_monitor] xQueueSend g_queue_esp8266 error code is %d\r\n", xReturn);
+
+			g_esp8266_rx_cnt = 0;
+			memset((void *)g_esp8266_rx_buf, 0, sizeof(g_esp8266_rx_buf));
+		}
+	}
+}
+/*ESP8266WIFI模块*/
+void app_task_esp8266(void *pvParameters)
+{
+	uint8_t buf[512];
+	uint8_t led_sta = 0;
+	beep_t beep;
+	BaseType_t xReturn = pdFALSE;
+	uint32_t i;
+
+	dgb_printf_safe("[app_task_esp8266] create success\r\n");
+
+	while (esp8266_mqtt_init())
+	{
+		dgb_printf_safe("[app_task_esp8266] esp8266_mqtt_init ...");
+
+		delay_ms(1000);
+	}
+
+	// 蜂鸣器嘀两声，D1灯闪烁两次，示意连接成功
+	/* 嘀一声示意:第一次 */
+	beep.sta = 1;
+	beep.duration = 50;
+	xReturn = xQueueSend(g_queue_beep, /* 消息队列的句柄 */
+						 &beep,		   /* 发送的消息内容 */
+						 100);		   /* 等待时间 100 Tick */
+	if (xReturn != pdPASS)
+		dgb_printf_safe("[app_task_esp8266] xQueueSend beep error code is %d\r\n", xReturn);
+	/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+	xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
+	if (xReturn != pdPASS)
+		dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+	delay_ms(100);
+	/* 嘀一声示意:第二次 */
+	beep.sta = 1;
+	beep.duration = 50;
+	xReturn = xQueueSend(g_queue_beep, /* 消息队列的句柄 */
+						 &beep,		   /* 发送的消息内容 */
+						 100);		   /* 等待时间 100 Tick */
+	if (xReturn != pdPASS)
+		dgb_printf_safe("[app_task_esp8266] xQueueSend beep error code is %d\r\n", xReturn);
+	/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+	xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
+	if (xReturn != pdPASS)
+		dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
+
+	dgb_printf_safe("[app_task_esp8266] esp8266 connect aliyun with mqtt success\r\n");
+
+	vTaskResume(app_task_mqtt_handle); // 唤醒MQTT任务，允许跟阿里云进行通信
+
+	g_esp8266_init = 1; // 标志esp8266初始化完成
+
+	for (;;)
+	{
+		/*等待阿里云发送数据包*/
+		xReturn = xQueueReceive(g_queue_esp8266, /* 消息队列的句柄 */
+								buf,			 /* 得到的消息内容 */
+								portMAX_DELAY);	 /* 等待时间一直等 */
+		if (xReturn != pdPASS)
+		{
+			dgb_printf_safe("[app_task_esp8266] xQueueReceive error code is %d\r\n", xReturn);
+			continue;
+		}
+
+		for (i = 0; i < sizeof(buf); i++)
+		{
+			// 判断的关键字符是否为 1"
+			// 核心数据，即{"switch_led_1":1}中的“1”
+			if ((buf[i] == 0x31) && (buf[i + 1] == 0x22))
+			{
+				// 判断控制变量
+				if (buf[i + 3] == '1')
+				{
+					led_sta = LED1_ON;
+					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
+				}
+				else
+				{
+					led_sta = LED1_OFF;
+					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
+				}
+			}
+
+			// 判断的关键字符是否为 2"
+			// 核心数据，即{"switch_led_2":1}中的“1”
+			if ((buf[i] == 0x32) && (buf[i + 1] == 0x22))
+			{
+				// 判断控制变量
+				if (buf[i + 3] == '1')
+				{
+					led_sta = LED2_ON;
+					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
+				}
+				else
+				{
+					led_sta = LED2_OFF;
+					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
+				}
+			}
+
+			// 判断的关键字符是否为 3"
+			// 核心数据，即{"switch_led_3":1}中的“1”
+			if (buf[i] == 0x33 && buf[i + 1] == 0x22)
+			{
+				// 判断控制变量
+				if (buf[i + 3] == '1')
+				{
+					led_sta = LED3_ON;
+					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
+				}
+				else
+				{
+					led_sta = LED3_OFF;
+					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
+					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
+					if (xReturn != pdPASS)
+						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
+				}
+			}
+		}
+	}
+}
 /*-----------------------------------------------------------*/
 
 void vApplicationMallocFailedHook(void)

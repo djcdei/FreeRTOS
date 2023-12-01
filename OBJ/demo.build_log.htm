@@ -22,38 +22,44 @@ Dialog DLL:      TCM.DLL V1.14.4.0
  
 <h2>Project:</h2>
 d:\STM32Project\FreeRTOS\USER\FreeRTOS.uvprojx
-Project File Date:  11/30/2023
+Project File Date:  12/01/2023
 
 <h2>Output:</h2>
 Build target 'FreeRTOS'
 compiling main.c...
-main.c(292): warning:  #520-D: initialization with "{...}" expected for aggregate object
+main.c(346): warning:  #520-D: initialization with "{...}" expected for aggregate object
         uint8_t buf[16] = 0;
-main.c(292): warning:  #177-D: variable "buf" was declared but never referenced
+main.c(346): warning:  #177-D: variable "buf" was declared but never referenced
         uint8_t buf[16] = 0;
-main.c(293): warning:  #177-D: variable "beep" was declared but never referenced
+main.c(347): warning:  #177-D: variable "beep" was declared but never referenced
         beep_t beep;
-main.c(513): warning:  #177-D: variable "cnt" was declared but never referenced
+main.c(580): warning:  #177-D: variable "cnt" was declared but never referenced
         static uint32_t cnt = 0; // 限制记录的温度只有10条
-main.c(912): warning:  #177-D: variable "pass_auth_eeprom" was declared but never referenced
+main.c(989): warning:  #177-D: variable "pass_auth_eeprom" was declared but never referenced
         char pass_auth_eeprom[PASS_LEN] = {0}; // 存储在e2prom里面的密码
-main.c(1381): warning:  #177-D: variable "distance" was declared but never referenced
+main.c(1503): warning:  #177-D: variable "distance" was declared but never referenced
         int32_t distance = 0;
-main.c(1382): warning:  #177-D: variable "t" was declared but never referenced
+main.c(1504): warning:  #177-D: variable "t" was declared but never referenced
         uint32_t t = 0;
-main.c(17): warning:  #177-D: variable "app_task_mfrc522real_handle" was declared but never referenced
+main.c(1774): warning:  #177-D: variable "buf" was declared but never referenced
+        uint8_t buf[5] = {20, 05, 56, 8, 20};
+main.c(16): warning:  #177-D: variable "app_task_mfrc522real_handle" was declared but never referenced
   static TaskHandle_t app_task_mfrc522real_handle = NULL;
-main.c(18): warning:  #177-D: variable "app_task_mfrc522admin_handle" was declared but never referenced
+main.c(17): warning:  #177-D: variable "app_task_mfrc522admin_handle" was declared but never referenced
   static TaskHandle_t app_task_mfrc522admin_handle = NULL;
-main.c(36): warning:  #177-D: function "app_task_mfrc522real" was declared but never referenced
+main.c(20): warning:  #177-D: variable "app_task_fr1002_handle" was declared but never referenced
+  static TaskHandle_t app_task_fr1002_handle = NULL;
+main.c(39): warning:  #177-D: function "app_task_mfrc522real" was declared but never referenced
   static void app_task_mfrc522real(void *pvParameters);  /*     rfid读卡任务函数*/
-main.c(37): warning:  #177-D: function "app_task_mfrc522admin" was declared but never referenced
+main.c(40): warning:  #177-D: function "app_task_mfrc522admin" was declared but never referenced
   static void app_task_mfrc522admin(void *pvParameters); /*     rfid管理任务函数*/
-main.c: 11 warnings, 0 errors
+main.c(1499): warning:  #177-D: function "app_task_fr1002" was declared but never referenced
+  void app_task_fr1002(void *pvParameters)
+main.c: 14 warnings, 0 errors
 linking...
-Program Size: Code=34252 RO-data=8692 RW-data=360 ZI-data=79560  
+Program Size: Code=39544 RO-data=9256 RW-data=408 ZI-data=81032  
 FromELF: creating hex file...
-"..\OBJ\demo.axf" - 0 Error(s), 11 Warning(s).
+"..\OBJ\demo.axf" - 0 Error(s), 14 Warning(s).
 
 <h2>Collection of Component include folders:</h2>
   d:\STM32Project\FreeRTOS\USER\RTE

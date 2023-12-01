@@ -63,11 +63,13 @@
 ..\obj\keyboard.o: ..\HARDWARE\FLASH\flash.h
 ..\obj\keyboard.o: ..\HARDWARE\KEY\key.h
 ..\obj\keyboard.o: ..\HARDWARE\KEYBOARD\keyboard.h
-..\obj\keyboard.o: ..\HARDWARE\MFRC522\MFRC522.h
+..\obj\keyboard.o: ..\HARDWARE\ESP8266\esp8266.h
+..\obj\keyboard.o: ..\HARDWARE\ESP8266\esp8266_mqtt.h
 ..\obj\keyboard.o: ..\HARDWARE\AT24C02\at24c02.h
 ..\obj\keyboard.o: ..\USER\includes.h
 ..\obj\keyboard.o: ..\HARDWARE\FPM383\fpm383.h
 ..\obj\keyboard.o: ..\HARDWARE\FR1002\fr1002.h
+..\obj\keyboard.o: ..\HARDWARE\MOTOR\motor.h
 ..\obj\keyboard.o: ..\HARDWARE\RTC\rtc.h
 ..\obj\keyboard.o: ..\HARDWARE\BEEP\beep.h
 ..\obj\keyboard.o: ..\HARDWARE\OLED\oled.h

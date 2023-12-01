@@ -63,11 +63,13 @@
 ..\obj\at24c02.o: ..\HARDWARE\FLASH\flash.h
 ..\obj\at24c02.o: ..\HARDWARE\KEY\key.h
 ..\obj\at24c02.o: ..\HARDWARE\KEYBOARD\keyboard.h
-..\obj\at24c02.o: ..\HARDWARE\MFRC522\MFRC522.h
+..\obj\at24c02.o: ..\HARDWARE\ESP8266\esp8266.h
+..\obj\at24c02.o: ..\HARDWARE\ESP8266\esp8266_mqtt.h
 ..\obj\at24c02.o: ..\HARDWARE\AT24C02\at24c02.h
 ..\obj\at24c02.o: ..\USER\includes.h
 ..\obj\at24c02.o: ..\HARDWARE\FPM383\fpm383.h
 ..\obj\at24c02.o: ..\HARDWARE\FR1002\fr1002.h
+..\obj\at24c02.o: ..\HARDWARE\MOTOR\motor.h
 ..\obj\at24c02.o: ..\HARDWARE\RTC\rtc.h
 ..\obj\at24c02.o: ..\HARDWARE\BEEP\beep.h
 ..\obj\at24c02.o: ..\HARDWARE\OLED\oled.h

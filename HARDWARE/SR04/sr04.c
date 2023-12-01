@@ -60,7 +60,7 @@ int32_t sr04_get_distance(void)
 			return -1;		
 	
 	}
-	printf("distance :%d\n",3*(t/2));
+	//printf("distance :%d\n",3*(t/2));
 	//当前的传输距离
 	return 3*(t/2);
 }

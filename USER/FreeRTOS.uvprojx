@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40_41xxx,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\HARDWARE\LED;..\FREERTOS\include;..\FREERTOS\port;..\HARDWARE\DHT11;..\HARDWARE\SR04;..\HARDWARE\BEEP;..\HARDWARE\FLASH;..\HARDWARE\KEY;..\HARDWARE\RTC;..\HARDWARE\OLED;..\HARDWARE\MFRC522;..\HARDWARE\KEYBOARD;..\HARDWARE\AT24C02;..\HARDWARE\FPM383;..\HARDWARE\FR1002</IncludePath>
+              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\HARDWARE\LED;..\FREERTOS\include;..\FREERTOS\port;..\HARDWARE\DHT11;..\HARDWARE\SR04;..\HARDWARE\BEEP;..\HARDWARE\FLASH;..\HARDWARE\KEY;..\HARDWARE\RTC;..\HARDWARE\OLED;..\HARDWARE\MFRC522;..\HARDWARE\KEYBOARD;..\HARDWARE\AT24C02;..\HARDWARE\FPM383;..\HARDWARE\FR1002;..\HARDWARE\MOTOR;..\HARDWARE\ESP8266</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -444,11 +444,6 @@
               <FilePath>..\HARDWARE\DHT11\dht11.c</FilePath>
             </File>
             <File>
-              <FileName>MFRC522.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\MFRC522\MFRC522.c</FilePath>
-            </File>
-            <File>
               <FileName>oled.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\OLED\oled.c</FilePath>
@@ -502,6 +497,21 @@
               <FileName>fr1002.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\FR1002\fr1002.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\MOTOR\motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>esp8266_mqtt.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ESP8266\esp8266_mqtt.c</FilePath>
+            </File>
+            <File>
+              <FileName>esp8266.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ESP8266\esp8266.c</FilePath>
             </File>
           </Files>
         </Group>

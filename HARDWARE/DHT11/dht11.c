@@ -19,7 +19,6 @@ void dht11_init(void)
 /*读取温湿度模块获取到的信息*/
 int32_t dht11_read(uint8_t *buf)
 {
-	static int cnt=0;
 	uint32_t t = 0;
 	int32_t i = 0, j = 0;
 	uint8_t d = 0;
@@ -119,7 +118,6 @@ int32_t dht11_read(uint8_t *buf)
 		flag = 0;
 	else
 		flag = -6;
-	printf("cnt=%d\r\n",cnt++);
 	return flag;
 }
 

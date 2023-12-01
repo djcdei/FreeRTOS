@@ -169,7 +169,7 @@ int32_t at24c02_write(uint8_t addr, uint8_t *buf, uint32_t len)
 
 	if (ack)
 	{
-		printf("device address error\r\n");
+		dgb_printf_safe("device address error\r\n");
 		return -1;
 	}
 
@@ -179,7 +179,7 @@ int32_t at24c02_write(uint8_t addr, uint8_t *buf, uint32_t len)
 	ack = at24c02_i2c_wait_ack();
 	if (ack)
 	{
-		printf("word address error\r\n");
+		dgb_printf_safe("word address error\r\n");
 		return -2;
 	}
 
@@ -191,13 +191,13 @@ int32_t at24c02_write(uint8_t addr, uint8_t *buf, uint32_t len)
 		ack = at24c02_i2c_wait_ack();
 		if (ack)
 		{
-			printf("write data error\r\n");
+			dgb_printf_safe("write data error\r\n");
 			return -3;
 		}
 	}
 	// 数据发送完成，发送停止信号
 	at24c02_i2c_stop();
-	printf("write data success\r\n");
+	dgb_printf_safe("write data success\r\n");
 	return 0;
 }
 
@@ -216,7 +216,7 @@ int32_t at24c02_read(uint8_t addr, uint8_t *buf, uint32_t len)
 	ack = at24c02_i2c_wait_ack();
 	if (ack)
 	{
-		printf("device address error\r\n");
+		dgb_printf_safe("device address error\r\n");
 		return -1;
 	}
 	// 发送要访问e2prom数据起始地址
@@ -225,7 +225,7 @@ int32_t at24c02_read(uint8_t addr, uint8_t *buf, uint32_t len)
 	ack = at24c02_i2c_wait_ack();
 	if (ack)
 	{
-		printf("device address error\r\n");
+		dgb_printf_safe("device address error\r\n");
 		return -1;
 	}
 
@@ -240,7 +240,7 @@ int32_t at24c02_read(uint8_t addr, uint8_t *buf, uint32_t len)
 	ack = at24c02_i2c_wait_ack();
 	if (ack)
 	{
-		printf("device address error\r\n");
+		dgb_printf_safe("device address error\r\n");
 		return -1;
 	}
 

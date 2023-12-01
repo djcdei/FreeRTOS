@@ -46,7 +46,7 @@ void flash_read(uint32_t num)
 		p = (volatile uint32_t *)((0x08010000 + i * sizeof(flash_t)));
 		if (*p == 0xffffffff)
 		{
-			printf("Пе\r\n");
+			dgb_printf_safe("Пе\r\n");
 		}
 		else
 		{
@@ -73,7 +73,7 @@ void flash_read(uint32_t num)
 			default:
 				break;
 			}
-			printf("20%02x/%02x/%02x %02x:%02x:%02x %s\n",
+			dgb_printf_safe("20%02x/%02x/%02x %02x:%02x:%02x %s\n",
 				   flash_read_buf.date[0],
 				   flash_read_buf.date[1],
 				   flash_read_buf.date[2],

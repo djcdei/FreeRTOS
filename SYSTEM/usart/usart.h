@@ -18,7 +18,11 @@ typedef struct __usart_t
 extern void usart1_init(u32 baud);
 extern void usart2_init(uint32_t baud);
 extern void usart3_init(u32 baud);
+extern void usart6_init(u32 baud);
 extern void usart_send_str(USART_TypeDef* USARTx,char *str);
 extern void usart_send_bytes(USART_TypeDef* USARTx,uint8_t *buf,uint32_t len);
+extern void usart3_send_str(char *str);
+extern void usart3_send_bytes(uint8_t *buf,uint32_t len);
+
 
 #endif

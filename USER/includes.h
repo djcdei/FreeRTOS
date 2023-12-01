@@ -23,10 +23,12 @@
 #include "flash.h"
 #include "key.h"
 #include "keyboard.h"
-#include "MFRC522.h"
+#include "esp8266.h"
+#include "esp8266_mqtt.h"
 #include "at24c02.h"
 #include "fpm383.h"
 #include "fr1002.h"
+#include "motor.h"
 // #include "mpu6050.h"
 // #include "inv_mpu.h"
 // #include "inv_mpu_dmp_motion_driver.h"
@@ -90,6 +92,8 @@
 #define QUEUE_FLASH_LEN 16
 #define QUEUE_KEYBOARD_LEN 4 /*矩阵键盘队列长度*/
 #define QUEUE_FSM_LEN 16 
+#define QUEUE_MOTOR_LEN 1 
+#define QUEUE_ESP8266_LEN 3
 
 /*rtc标志位*/
 #define FLAG_RTC_GET_NONE 0
@@ -111,16 +115,28 @@
 #define XOR_KEY 0X88		   // 解密密钥
 
 /* 变量 */
+/*互斥信号量句柄*/
 extern SemaphoreHandle_t g_mutex_printf;
+/* 安全打印函数 */
+extern void dgb_printf_safe(const char *format, ...);
 
+/* 变量 */
+extern float g_temp;
+extern float g_humi;
+
+/*事件标志组*/
 extern EventGroupHandle_t g_event_group;
 
-/*串口队列*/
+/*串口队列句柄*/
 extern QueueHandle_t g_queue_usart;
 /* 人脸队列句柄 */
 extern QueueHandle_t 	g_queue_frm;
 
+/* wifi队列句柄 */
+extern QueueHandle_t 	g_queue_esp8266;
+
 /* 相关硬件消息类型结构设计 */
+extern volatile uint32_t g_ISR_dbg;//判断中断服务函数是否被触发的调试标志位
 
 /*oled消息结构*/
 typedef struct __oled_t

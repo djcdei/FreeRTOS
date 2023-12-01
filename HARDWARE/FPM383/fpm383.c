@@ -93,14 +93,14 @@ static void usart2_printf_recv_buf(void)
 {
 	uint32_t i;
 	
-	printf("usart2 recv buf:");
+	dgb_printf_safe("usart2 recv buf:");
 	
 	for(i=0;i<USART2_STA;i++)
 	{
-		printf("%02X ",g_usart2_buf[i]);
+		dgb_printf_safe("%02X ",g_usart2_buf[i]);
 	
 	}
-	printf("\r\n");
+	dgb_printf_safe("\r\n");
 }
 
 
@@ -176,14 +176,14 @@ int32_t fpm_empty(void)
 	
 	if(g_usart2_buf[0]!=0xEF && g_usart2_buf[1]!=0x01)
 	{
-		printf("请检查硬件连接\r\n");
+		dgb_printf_safe("请检查硬件连接\r\n");
 
 		return -1;
 	}	
 	
 	if(!timeout)
 	{
-		printf("清空指纹:超时\r\n");
+		dgb_printf_safe("清空指纹:超时\r\n");
 		
 		return -1;
 	}
@@ -192,8 +192,8 @@ int32_t fpm_empty(void)
 	if(g_usart2_buf[9] != 0x00)
 	{
 	
-		printf("清空指纹：失败 %02X\r\n",g_usart2_buf[9] );
-		printf("请不要按压指纹模块\r\n");
+		dgb_printf_safe("清空指纹：失败 %02X\r\n",g_usart2_buf[9] );
+		dgb_printf_safe("请不要按压指纹模块\r\n");
 		return -1;
 		
 	}	
@@ -254,15 +254,15 @@ int32_t fpm_enroll_auto(uint16_t id)
 	
 	if(g_usart2_buf[0]!=0xEF && g_usart2_buf[1]!=0x01)
 	{
-		printf("自动注册指纹:数据包异常！\r\n");
-		printf("1.检查硬件连接\r\n");
-		printf("2.检查是否有按压指纹模块\r\n");		
+		dgb_printf_safe("自动注册指纹:数据包异常！\r\n");
+		dgb_printf_safe("1.检查硬件连接\r\n");
+		dgb_printf_safe("2.检查是否有按压指纹模块\r\n");		
 		return -1;
 	}	
 	
 	if(!timeout)
 	{
-		printf("自动注册指纹:超时\r\n");
+		dgb_printf_safe("自动注册指纹:超时\r\n");
 		
 		return -1;
 	}
@@ -271,7 +271,7 @@ int32_t fpm_enroll_auto(uint16_t id)
 	if(g_usart2_buf[9] != 0x00)
 	{
 	
-		printf("自动注册指纹：失败 %02X\r\n",g_usart2_buf[9] );
+		dgb_printf_safe("自动注册指纹：失败 %02X\r\n",g_usart2_buf[9] );
 		
 		return -1;
 		
@@ -334,15 +334,15 @@ int32_t fpm_idenify_auto(uint16_t *id)
 	
 	if(g_usart2_buf[0]!=0xEF && g_usart2_buf[1]!=0x01)
 	{
-		printf("自动验证指纹:数据包异常！\r\n");
-		printf("1.检查硬件连接\r\n");
-		printf("2.检查是否有按压指纹模块\r\n");		
+		dgb_printf_safe("自动验证指纹:数据包异常！\r\n");
+		dgb_printf_safe("1.检查硬件连接\r\n");
+		dgb_printf_safe("2.检查是否有按压指纹模块\r\n");		
 		return -1;
 	}	
 	
 	if(!timeout)
 	{
-		printf("自动验证指纹:超时\r\n");
+		dgb_printf_safe("自动验证指纹:超时\r\n");
 		return -1;
 	}
 	
@@ -350,7 +350,7 @@ int32_t fpm_idenify_auto(uint16_t *id)
 	if(g_usart2_buf[9] != 0x00)
 	{
 	
-		printf("自动验证指纹：失败 %02X\r\n",g_usart2_buf[9] );
+		dgb_printf_safe("自动验证指纹：失败 %02X\r\n",g_usart2_buf[9] );
 		
 		return -1;
 		
@@ -359,7 +359,7 @@ int32_t fpm_idenify_auto(uint16_t *id)
 	/* 分数值异常 */
 	if(((g_usart2_buf[13]<<8)|g_usart2_buf[14])==0xFFFF)
 	{
-		printf("自动验证指纹：分数值异常，可能没有存在该指纹\r\n");
+		dgb_printf_safe("自动验证指纹：分数值异常，可能没有存在该指纹\r\n");
 		
 		return -1;		
 	
@@ -394,14 +394,14 @@ int32_t fpm_id_total(uint16_t *total)
 	
 	if(g_usart2_buf[0]!=0xEF && g_usart2_buf[1]!=0x01)
 	{
-		printf("请检查硬件连接\r\n");
+		dgb_printf_safe("请检查硬件连接\r\n");
 
 		return -1;
 	}	
 	
 	if(!timeout)
 	{
-		printf("获取有效指纹总数:超时\r\n");
+		dgb_printf_safe("获取有效指纹总数:超时\r\n");
 		
 		return -1;
 	}
@@ -410,8 +410,8 @@ int32_t fpm_id_total(uint16_t *total)
 	if(g_usart2_buf[9] != 0x00)
 	{
 	
-		printf("获取有效指纹总数：失败 %02X\r\n",g_usart2_buf[9] );
-		printf("请不要按压指纹模块\r\n");
+		dgb_printf_safe("获取有效指纹总数：失败 %02X\r\n",g_usart2_buf[9] );
+		dgb_printf_safe("请不要按压指纹模块\r\n");
 		return -1;
 		
 	}	

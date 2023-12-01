@@ -24,9 +24,9 @@ void _sys_exit(int x)
 // 重定义fputc函数
 int fputc(int ch, FILE *f)
 {
-	while ((USART3->SR & 0X40) == 0)
+	while ((USART6->SR & 0X40) == 0)
 		; // 循环发送,直到发送完毕
-	USART3->DR = (u8)ch;
+	USART6->DR = (u8)ch;
 	return ch;
 }
 
@@ -122,29 +122,82 @@ void usart2_init(uint32_t baud)
 	USART_Cmd(USART2, ENABLE);
 }
 
-// 串口USART3的初始化配置，用于蓝牙通信，要注意配置优先级的时候不能高于configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY
-void usart3_init(u32 baud)
+
+//串口3初始化用于WIFI通信
+void usart3_init(uint32_t baud)
+{
+	// GPIO端口设置
+	GPIO_InitTypeDef GPIO_InitStructure;
+	USART_InitTypeDef USART_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+	//使能端口B硬件时钟
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB,ENABLE);
+	
+	//使能串口3硬件时钟
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3,ENABLE);
+	
+	//配置PB10、PB11为复用功能引脚
+	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_10|GPIO_Pin_11;
+	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_Speed = GPIO_High_Speed;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;	
+	GPIO_Init(GPIOB,&GPIO_InitStructure);
+	
+	//将PB10、PB11连接到USART3的硬件
+	GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_USART3);
+	GPIO_PinAFConfig(GPIOB, GPIO_PinSource11, GPIO_AF_USART3);
+	
+	
+	//配置USART1的相关参数：波特率、数据位、校验位
+	USART_InitStructure.USART_BaudRate = baud;//波特率
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;//8位数据位
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;//1位停止位
+	USART_InitStructure.USART_Parity = USART_Parity_No;//无奇偶校验
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//无硬件流控制
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;//允许串口发送和接收数据
+	USART_Init(USART3, &USART_InitStructure);
+	
+	
+	//使能串口接收到数据触发中断
+	USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
+	
+	NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+	
+	//使能串口3工作
+	USART_Cmd(USART3,ENABLE);
+}
+
+
+// 串口USART6的初始化配置，用于蓝牙通信，要注意配置优先级的时候不能高于configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY
+void usart6_init(u32 baud)
 {
 	// GPIO端口设置
 	GPIO_InitTypeDef GPIO_InitStructure;
 	USART_InitTypeDef USART_InitStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
 	/* Enable GPIO clock */
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+	
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
 	/* Enable USART clock */
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART6, ENABLE);
 
 	/* Configure USART Tx and Rx as alternate function push-pull */
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_11;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6|GPIO_Pin_7;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF; // 端口复用
 	GPIO_InitStructure.GPIO_Speed = GPIO_High_Speed;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL; // 不使能上下拉电阻
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-	// 复用引脚PB10 / PB11的功能，配置为USART3_TX / USART3_RX （查阅硬件原理图）
-	GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_USART3);
-	GPIO_PinAFConfig(GPIOB, GPIO_PinSource11, GPIO_AF_USART3);
+	// 复用引脚PC6 / PC7的功能，配置为USART6_TX / USART6_RX （查阅硬件原理图）
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_USART6);
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_USART6);
 
 	USART_InitStructure.USART_BaudRate = baud; // 设置波特率
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
@@ -152,16 +205,17 @@ void usart3_init(u32 baud)
 	USART_InitStructure.USART_Parity = USART_Parity_No;
 	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
 	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
-	// Init USART3
-	USART_Init(USART3, &USART_InitStructure);
+	// Init USART6
+	USART_Init(USART6, &USART_InitStructure);
 	/* Enable USART */
-	USART_Cmd(USART3, ENABLE);
+	USART_Cmd(USART6, ENABLE);
 
 	// 若需要中断，则配置中断相关参数
-	USART_ITConfig(USART3, USART_IT_RXNE, ENABLE); // 设置为:接收数据寄存器不空中断（参数2）
+	USART_ITConfig(USART6, USART_IT_RXNE, ENABLE); // 设置为:接收数据寄存器不空中断（参数2）
 
-	/* Enable the USART1 Interrupt */
-	NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;													 // 指定USART3_IQR通道
+	USART_ClearITPendingBit(USART6, USART_IT_RXNE); // 清空串口接收中断标志位
+	/* Enable the USART6 Interrupt */
+	NVIC_InitStructure.NVIC_IRQChannel = USART6_IRQn;													 // 指定USART3_IQR通道
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY; // 抢占优先级
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY;		 // 响应优先级
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;														 // 使能中断请求通道
@@ -199,6 +253,38 @@ void usart_send_bytes(USART_TypeDef *USARTx, uint8_t *buf, uint32_t len)
 		while (USART_GetFlagStatus(USARTx, USART_FLAG_TXE) == RESET)
 			;
 		USART_ClearFlag(USARTx, USART_FLAG_TXE);
+	}
+}
+
+
+void usart3_send_str(char *str)
+{
+	char *p = str;
+	
+	while(*p!='\0')
+	{
+		USART_SendData(USART3,*p);
+		
+		p++;
+		
+		//等待数据发送成功
+		while(USART_GetFlagStatus(USART3,USART_FLAG_TXE)==RESET);
+	}
+}
+
+
+void usart3_send_bytes(uint8_t *buf,uint32_t len)
+{
+	uint8_t *p = buf;
+	
+	while(len--)
+	{
+		USART_SendData(USART3,*p);
+		
+		p++;
+		
+		//等待数据发送成功
+		while(USART_GetFlagStatus(USART3,USART_FLAG_TXE)==RESET);
 	}
 }
 
@@ -289,30 +375,28 @@ void USART1_IRQHandler(void)
 	taskEXIT_CRITICAL_FROM_ISR(ulReturn);
 }
 
-// 串口3中断服务程序,用于蓝牙通信
-void USART3_IRQHandler(void)
+ 
+void USART6_IRQHandler(void)
 {
 	static uint32_t i = 0;
-
 	uint8_t data;
-
 	uint32_t ulReturn;
-
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
+	
 	/* 进入临界段，临界段可以嵌套 */
 	ulReturn = taskENTER_CRITICAL_FROM_ISR();
 
-	if (USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)
-	{
+	if (USART_GetITStatus(USART6, USART_IT_RXNE) != RESET)
+	{	
 		// 接收串口数据
-		data = USART_ReceiveData(USART3);
-
+		data = USART_ReceiveData(USART6);
+		
 		g_usart_packet.rx_buf[i++] = data;
-
+		
 		// 检测到'#'符或接收的数据满的时候则发送数据
 		if (data == '#' || i >= (sizeof g_usart_packet.rx_buf))
 		{
+			
 			g_usart_packet.rx_len = i;
 
 			xQueueSendFromISR(g_queue_usart, (void *)&g_usart_packet, &xHigherPriorityTaskWoken); // 将串口数据包发送到串口队列
@@ -321,9 +405,9 @@ void USART3_IRQHandler(void)
 
 			i = 0;
 		}
-
 		// 清空串口接收中断标志位
-		USART_ClearITPendingBit(USART3, USART_IT_RXNE);
+		USART_ClearITPendingBit(USART6, USART_IT_RXNE);
+		
 	}
 
 	/* 若接收消息队列任务的优先级高于当前运行的任务，则退出中断后立即进行任务切换，执行前者 */

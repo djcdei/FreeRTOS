@@ -24,6 +24,8 @@
                 "d:\\STM32Project\\FreeRTOS\\HARDWARE\\AT24C02",
                 "d:\\STM32Project\\FreeRTOS\\HARDWARE\\FPM383",
                 "d:\\STM32Project\\FreeRTOS\\HARDWARE\\FR1002",
+                "d:\\STM32Project\\FreeRTOS\\HARDWARE\\MOTOR",
+                "d:\\STM32Project\\FreeRTOS\\HARDWARE\\ESP8266",
                 "D:\\Keil_v5\\ARM\\ARMCC\\include",
                 "D:\\Keil_v5\\ARM\\ARMCC\\include\\rw",
                 "d:\\STM32Project\\FreeRTOS\\HARDWARE\\W25Q128",
