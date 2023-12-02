@@ -19,6 +19,7 @@
 "..\obj\motor.o"
 "..\obj\esp8266_mqtt.o"
 "..\obj\esp8266.o"
+"..\obj\cjson.o"
 "..\obj\delay.o"
 "..\obj\sys.o"
 "..\obj\usart.o"

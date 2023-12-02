@@ -48,7 +48,7 @@ int32_t esp8266_find_str_in_rx_packet(char *str,uint32_t timeout)
 		timeout--;
 	}
 #if EN_DEBUG_ESP8266	
-	printf("[find str]%s ,timeout=%d\r\n",(const char *)g_esp8266_rx_buf,timeout);
+	dgb_printf_safe("[esp8266_find str]%s ,timeout=%d\r\n",(const char *)g_esp8266_rx_buf,timeout);
 #endif
 	if(timeout) 
 		return 0; 

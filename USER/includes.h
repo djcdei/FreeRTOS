@@ -41,6 +41,8 @@
 #include "oledfont.h"
 #include "bmp.h"
 
+//#include "cJSON.h"
+
 /*RFID射频卡状态宏定义*/
 #define STA_CARD_REQUEST 0 // RFID请求
 #define STA_CARD_FOUND 1
@@ -123,6 +125,7 @@ extern void dgb_printf_safe(const char *format, ...);
 /* 变量 */
 extern float g_temp;
 extern float g_humi;
+extern volatile uint32_t g_unlock_what;
 
 /*事件标志组*/
 extern EventGroupHandle_t g_event_group;

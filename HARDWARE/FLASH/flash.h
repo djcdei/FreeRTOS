@@ -13,6 +13,7 @@ typedef struct __flash_t
 #define MODE_OPEN_LOCK_RFID 0x08	 // RFID解锁数据
 #define MODE_OPEN_LOCK_SFM 0x10		 // 指纹解锁
 #define MODE_OPEN_LOCK_FRM 0X20		 // 人脸解锁
+#define MODE_OPEN_LOCK_MQTT 0X40		 // MQTT网络远程解锁
 
 	uint32_t offset;	 // 位置
 	uint8_t mode;		 // 模式(选择上面的宏定义模式)

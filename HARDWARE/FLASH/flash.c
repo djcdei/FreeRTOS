@@ -46,41 +46,44 @@ void flash_read(uint32_t num)
 		p = (volatile uint32_t *)((0x08010000 + i * sizeof(flash_t)));
 		if (*p == 0xffffffff)
 		{
-			dgb_printf_safe("Пе\r\n");
+			dgb_printf_safe("NULL\r\n");
 		}
 		else
 		{
 			switch (flash_read_buf.mode)
 			{
 			case MODE_OPEN_LOCK_KEYBOARD:
-				sprintf((char *)buf, "%s", "keyboard unlock");
+				sprintf((char *)buf, "%s", "KEYBORAD unlock");
 				break;
 			case MODE_OPEN_LOCK_BLUE:
-				sprintf((char *)buf, "%s", "bluetooth unlock");
+				sprintf((char *)buf, "%s", "BLUETOOTH unlock");
 				break;
 			case MODE_OPEN_LOCK_DHT:
-				sprintf((char *)buf, "%s:%s", "dht data", flash_read_buf.databuf);
+				sprintf((char *)buf, "%s:%s", "DHT data", flash_read_buf.databuf);
 				break;
 			case MODE_OPEN_LOCK_RFID:
-				sprintf((char *)buf, "%s", "rfid unlock");
+				sprintf((char *)buf, "%s", "RFID unlock");
 				break;
 			case MODE_OPEN_LOCK_SFM:
-				sprintf((char *)buf, "%s", "sfm unlock");
+				sprintf((char *)buf, "%s", "SFM unlock");
 				break;
 			case MODE_OPEN_LOCK_FRM:
-				sprintf((char *)buf, "%s", "frm unlock");
+				sprintf((char *)buf, "%s", "FRM unlock");
+				break;
+			case MODE_OPEN_LOCK_MQTT:
+				sprintf((char *)buf, "%s", "MQTT unlock");
 				break;
 			default:
 				break;
 			}
 			dgb_printf_safe("20%02x/%02x/%02x %02x:%02x:%02x %s\n",
-				   flash_read_buf.date[0],
-				   flash_read_buf.date[1],
-				   flash_read_buf.date[2],
-				   flash_read_buf.date[3],
-				   flash_read_buf.date[4],
-				   flash_read_buf.date[5],
-				   buf);
+							flash_read_buf.date[0],
+							flash_read_buf.date[1],
+							flash_read_buf.date[2],
+							flash_read_buf.date[3],
+							flash_read_buf.date[4],
+							flash_read_buf.date[5],
+							buf);
 		}
 	}
 	FLASH_Lock();

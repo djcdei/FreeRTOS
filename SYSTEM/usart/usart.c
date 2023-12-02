@@ -21,6 +21,11 @@ void _sys_exit(int x)
 {
 	x = x;
 }
+void _ttywrch(int ch) {
+    // 可以为空，或者根据需要提供一些实现
+}
+
+
 // 重定义fputc函数
 int fputc(int ch, FILE *f)
 {

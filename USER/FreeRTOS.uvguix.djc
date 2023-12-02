@@ -92,8 +92,8 @@
     <MDIClientArea>
       <RegID>0</RegID>
       <MDITabState>
-        <Len>702</Len>
-        <Data>01000000040000000100000001000000010000000100000000000000020000000000000001000000010000000000000028000000280000000100000007000000040000000100000033443A5C53544D333250726F6A6563745C4672656552544F535C48415244574152455C455350383236365C657370383236362E630000000009657370383236362E6300000000F7B88600FFFFFFFF38443A5C53544D333250726F6A6563745C4672656552544F535C48415244574152455C455350383236365C657370383236365F6D7174742E63000000000E657370383236365F6D7174742E63000000009CC1B600FFFFFFFF28443A5C53544D333250726F6A6563745C4672656552544F535C555345525C696E636C756465732E68000000000A696E636C756465732E6800000000D9ADC200FFFFFFFF2D443A5C53544D333250726F6A6563745C4672656552544F535C53595354454D5C75736172745C75736172742E68000000000775736172742E6800000000F7B88600FFFFFFFF24443A5C53544D333250726F6A6563745C4672656552544F535C555345525C6D61696E2E6300000000066D61696E2E63000000009CC1B600FFFFFFFF2D443A5C53544D333250726F6A6563745C4672656552544F535C53595354454D5C75736172745C75736172742E63000000000775736172742E6300000000BCA8E100FFFFFFFF36443A5C53544D333250726F6A6563745C4672656552544F535C434F52455C737461727475705F73746D33326634305F34317878782E730000000018737461727475705F73746D33326634305F34317878782E7300000000F0A0A100FFFFFFFF0100000010000000C5D4F200FFDC7800BECEA100F0A0A100BCA8E1009CC1B600F7B88600D9ADC200A5C2D700B3A6BE00EAD6A300F6FA7D00B5E99D005FC3CF00C1838300CACAD50001000000000000000200000000000000660000002304000098020000</Data>
+        <Len>918</Len>
+        <Data>0100000004000000010000000100000001000000010000000000000002000000000000000100000001000000000000002800000028000000010000000A00000007000000010000002F443A5C53544D333250726F6A6563745C4672656552544F535C48415244574152455C464C4153485C666C6173682E680000000007666C6173682E6800000000EAD6A300FFFFFFFF2F443A5C53544D333250726F6A6563745C4672656552544F535C48415244574152455C464C4153485C666C6173682E630000000007666C6173682E6300000000B3A6BE00FFFFFFFF2F443A5C53544D333250726F6A6563745C4672656552544F535C48415244574152455C434A534F4E5C634A534F4E2E630000000007634A534F4E2E6300000000A5C2D700FFFFFFFF33443A5C53544D333250726F6A6563745C4672656552544F535C48415244574152455C455350383236365C657370383236362E630000000009657370383236362E6300000000D9ADC200FFFFFFFF38443A5C53544D333250726F6A6563745C4672656552544F535C48415244574152455C455350383236365C657370383236365F6D7174742E63000000000E657370383236365F6D7174742E6300000000F7B88600FFFFFFFF28443A5C53544D333250726F6A6563745C4672656552544F535C555345525C696E636C756465732E68000000000A696E636C756465732E68000000009CC1B600FFFFFFFF2D443A5C53544D333250726F6A6563745C4672656552544F535C53595354454D5C75736172745C75736172742E68000000000775736172742E6800000000BCA8E100FFFFFFFF24443A5C53544D333250726F6A6563745C4672656552544F535C555345525C6D61696E2E6300000000066D61696E2E6300000000F0A0A100FFFFFFFF2D443A5C53544D333250726F6A6563745C4672656552544F535C53595354454D5C75736172745C75736172742E63000000000775736172742E6300000000BECEA100FFFFFFFF36443A5C53544D333250726F6A6563745C4672656552544F535C434F52455C737461727475705F73746D33326634305F34317878782E730000000018737461727475705F73746D33326634305F34317878782E7300000000FFDC7800FFFFFFFF0100000010000000C5D4F200FFDC7800BECEA100F0A0A100BCA8E1009CC1B600F7B88600D9ADC200A5C2D700B3A6BE00EAD6A300F6FA7D00B5E99D005FC3CF00C1838300CACAD50001000000000000000200000000000000660000002304000098020000</Data>
       </MDITabState>
     </MDIClientArea>
     <ViewEx>
@@ -128,7 +128,7 @@
         <IsActivated>0</IsActivated>
         <MRUWidth>32767</MRUWidth>
         <PinState>0</PinState>
-        <RecentFrameAlignment>4096</RecentFrameAlignment>
+        <RecentFrameAlignment>16384</RecentFrameAlignment>
         <RecentRowIndex>0</RecentRowIndex>
         <RectRecentDocked>
           <Len>16</Len>
@@ -148,7 +148,7 @@
         <IsActivated>0</IsActivated>
         <MRUWidth>32767</MRUWidth>
         <PinState>0</PinState>
-        <RecentFrameAlignment>4096</RecentFrameAlignment>
+        <RecentFrameAlignment>16384</RecentFrameAlignment>
         <RecentRowIndex>0</RecentRowIndex>
         <RectRecentDocked>
           <Len>16</Len>
@@ -428,7 +428,7 @@
         <IsActivated>0</IsActivated>
         <MRUWidth>32767</MRUWidth>
         <PinState>0</PinState>
-        <RecentFrameAlignment>4096</RecentFrameAlignment>
+        <RecentFrameAlignment>16384</RecentFrameAlignment>
         <RecentRowIndex>0</RecentRowIndex>
         <RectRecentDocked>
           <Len>16</Len>
@@ -448,7 +448,7 @@
         <IsActivated>0</IsActivated>
         <MRUWidth>32767</MRUWidth>
         <PinState>0</PinState>
-        <RecentFrameAlignment>4096</RecentFrameAlignment>
+        <RecentFrameAlignment>16384</RecentFrameAlignment>
         <RecentRowIndex>0</RecentRowIndex>
         <RectRecentDocked>
           <Len>16</Len>
@@ -1108,7 +1108,7 @@
         <IsActivated>0</IsActivated>
         <MRUWidth>32767</MRUWidth>
         <PinState>0</PinState>
-        <RecentFrameAlignment>4096</RecentFrameAlignment>
+        <RecentFrameAlignment>16384</RecentFrameAlignment>
         <RecentRowIndex>0</RecentRowIndex>
         <RectRecentDocked>
           <Len>16</Len>
@@ -2585,11 +2585,38 @@
     <ActiveMDIGroup>0</ActiveMDIGroup>
     <MDIGroup>
       <Size>100</Size>
-      <ActiveTab>4</ActiveTab>
+      <ActiveTab>7</ActiveTab>
+      <Doc>
+        <Name>..\HARDWARE\FLASH\flash.h</Name>
+        <ColumnNumber>32</ColumnNumber>
+        <TopLine>1</TopLine>
+        <CurrentLine>20</CurrentLine>
+        <Folding>1</Folding>
+        <ContractedFolders></ContractedFolders>
+        <PaneID>0</PaneID>
+      </Doc>
+      <Doc>
+        <Name>..\HARDWARE\FLASH\flash.c</Name>
+        <ColumnNumber>42</ColumnNumber>
+        <TopLine>35</TopLine>
+        <CurrentLine>80</CurrentLine>
+        <Folding>1</Folding>
+        <ContractedFolders></ContractedFolders>
+        <PaneID>0</PaneID>
+      </Doc>
+      <Doc>
+        <Name>..\HARDWARE\CJSON\cJSON.c</Name>
+        <ColumnNumber>0</ColumnNumber>
+        <TopLine>1</TopLine>
+        <CurrentLine>1</CurrentLine>
+        <Folding>1</Folding>
+        <ContractedFolders></ContractedFolders>
+        <PaneID>0</PaneID>
+      </Doc>
       <Doc>
         <Name>..\HARDWARE\ESP8266\esp8266.c</Name>
         <ColumnNumber>37</ColumnNumber>
-        <TopLine>1</TopLine>
+        <TopLine>3</TopLine>
         <CurrentLine>5</CurrentLine>
         <Folding>1</Folding>
         <ContractedFolders></ContractedFolders>
@@ -2597,18 +2624,18 @@
       </Doc>
       <Doc>
         <Name>..\HARDWARE\ESP8266\esp8266_mqtt.c</Name>
-        <ColumnNumber>38</ColumnNumber>
-        <TopLine>28</TopLine>
-        <CurrentLine>32</CurrentLine>
+        <ColumnNumber>21</ColumnNumber>
+        <TopLine>30</TopLine>
+        <CurrentLine>34</CurrentLine>
         <Folding>1</Folding>
         <ContractedFolders></ContractedFolders>
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
         <Name>includes.h</Name>
-        <ColumnNumber>25</ColumnNumber>
-        <TopLine>88</TopLine>
-        <CurrentLine>96</CurrentLine>
+        <ColumnNumber>18</ColumnNumber>
+        <TopLine>140</TopLine>
+        <CurrentLine>44</CurrentLine>
         <Folding>1</Folding>
         <ContractedFolders></ContractedFolders>
         <PaneID>0</PaneID>
@@ -2616,7 +2643,7 @@
       <Doc>
         <Name>..\SYSTEM\usart\usart.h</Name>
         <ColumnNumber>34</ColumnNumber>
-        <TopLine>3</TopLine>
+        <TopLine>5</TopLine>
         <CurrentLine>21</CurrentLine>
         <Folding>1</Folding>
         <ContractedFolders></ContractedFolders>
@@ -2624,9 +2651,9 @@
       </Doc>
       <Doc>
         <Name>.\main.c</Name>
-        <ColumnNumber>0</ColumnNumber>
-        <TopLine>38</TopLine>
-        <CurrentLine>45</CurrentLine>
+        <ColumnNumber>14</ColumnNumber>
+        <TopLine>1819</TopLine>
+        <CurrentLine>1838</CurrentLine>
         <Folding>1</Folding>
         <ContractedFolders></ContractedFolders>
         <PaneID>0</PaneID>
@@ -2634,16 +2661,16 @@
       <Doc>
         <Name>..\SYSTEM\usart\usart.c</Name>
         <ColumnNumber>13</ColumnNumber>
-        <TopLine>1</TopLine>
+        <TopLine>3</TopLine>
         <CurrentLine>12</CurrentLine>
         <Folding>1</Folding>
-        <ContractedFolders>80,126</ContractedFolders>
+        <ContractedFolders></ContractedFolders>
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
         <Name>..\CORE\startup_stm32f40_41xxx.s</Name>
         <ColumnNumber>0</ColumnNumber>
-        <TopLine>176</TopLine>
+        <TopLine>178</TopLine>
         <CurrentLine>182</CurrentLine>
         <Folding>1</Folding>
         <ContractedFolders></ContractedFolders>

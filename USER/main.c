@@ -1,5 +1,7 @@
 #include "includes.h"
 
+#define MAX_DATA_SIZE 512 // 定义足够大的数组大小
+#define MAX_TOKENS 512
 /*任务句柄，一个硬件一个任务句柄控制*/
 static TaskHandle_t app_task_init_handle = NULL;
 static TaskHandle_t app_task_led_handle = NULL;
@@ -116,7 +118,7 @@ int main(void)
 	SysTick_Config(SystemCoreClock / configTICK_RATE_HZ);
 
 	//	/* 初始化串口1 */
-	//	usart1_init(115200);
+	// usart1_init(115200);
 	/*初始化串口3*/
 	// usart3_init(9600);
 	usart6_init(9600);
@@ -155,7 +157,7 @@ static const task_t task_tbl[] = {
 	{app_task_motor, "app_task_motor", 512, NULL, 5, &app_task_motor_handle},
 	{app_task_mqtt, "app_task_mqtt", 512, NULL, 5, &app_task_mqtt_handle},
 	{app_task_monitor, "app_task_monitor", 512, NULL, 5, &app_task_monitor_handle},
-	{app_task_esp8266, "app_task_esp8266", 1024, NULL, 5, &app_task_esp8266_handle},
+	{app_task_esp8266, "app_task_esp8266", 2048, NULL, 5, &app_task_esp8266_handle},
 	{0, 0, 0, 0, 0, 0}};
 
 static void app_task_init(void *pvParameters)
@@ -327,15 +329,15 @@ static void app_task_beep(void *pvParameters)
 		if (xReturn != pdPASS)
 			continue;
 		// 检查蜂鸣器是否需要持续工作
-		// if (beep.duration)
-		// {
-		// 	BEEP(beep.sta);
-		// 	while (beep.duration--)
-		// 		vTaskDelay(1);
-		// 	/* 蜂鸣器状态翻转 */
-		// 	beep.sta ^= 1;
-		// }
-		// BEEP(beep.sta);
+		if (beep.duration)
+		{
+			BEEP(beep.sta);
+			while (beep.duration--)
+				vTaskDelay(1);
+			/* 蜂鸣器状态翻转 */
+			beep.sta ^= 1;
+		}
+		BEEP(beep.sta);
 		/* 释放信号量，告诉对方，当前beep控制任务已经完成 */
 		xSemaphoreGive(g_sem_beep);
 	}
@@ -392,23 +394,12 @@ static void app_task_key(void *pvParameters)
 			if (PEin(2) == 0)
 			{
 				dgb_printf_safe("[app_task_key] S2 Press\r\n");
-				vTaskSuspend(app_task_rtc_handle); // 挂起实时时钟任务
+				vTaskSuspend(app_task_rtc_handle);	// 挂起实时时钟任务
 				g_rtc_get_what = FLAG_RTC_GET_NONE; // 	不显示时间信息
 				if (g_unlock_what == FLAG_UNLOCK_NO)
 				{
 					// 发送验证指纹事件
 					xEventGroupSetBits(g_event_group, EVENT_GROUP_FPM_AUTH);
-				}
-
-				else if (g_unlock_what == FLAG_UNLOCK_OK)
-				{
-					oled.ctrl = OLED_CTRL_CLEAR;
-					xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
-										 &oled,		   /* 发送的消息内容 */
-										 100);		   /* 等待时间 100 Tick */
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_dht] xQueueSend oled string error code is %d\r\n", xReturn);
-					g_dht_get_what = !g_dht_get_what; // 切换获取温度状态
 				}
 			}
 			// 等待按键释放
@@ -449,15 +440,6 @@ static void app_task_key(void *pvParameters)
 				dgb_printf_safe("[app_task_key] S4 Press\r\n");
 				// 发送删除指纹事件
 				xEventGroupSetBits(g_event_group, EVENT_GROUP_FPM_DELETE);
-
-				vTaskResume(app_task_rtc_handle);	// 恢复rtc任务
-				g_rtc_get_what = FLAG_RTC_GET_TIME; // 获取时间
-				// g_rtc_get_what = FLAG_RTC_GET_DATE; // 获取日期
-
-				oled.ctrl = OLED_CTRL_CLEAR; /* oled清屏 */
-				xReturn = xQueueSend(g_queue_oled, &oled, 100);
-				if (xReturn != pdPASS)
-					dgb_printf_safe("[app_task_key] xQueueSend oled string error code is %d\r\n", xReturn);
 			}
 
 			// 等待按键释放
@@ -864,6 +846,7 @@ static void app_task_usart(void *pvParameters)
 	uint32_t i = 0;
 	char *p = NULL;
 	char key_val = 0;
+	oled_t oled;
 
 	BaseType_t xReturn = pdFALSE;
 
@@ -887,10 +870,36 @@ static void app_task_usart(void *pvParameters)
 		dgb_printf_safe("[app_task_usart] recv data:%s\r\n", usart_packet.rx_buf);
 
 		// 获取当前温湿度
-		if (strstr((char *)usart_packet.rx_buf, "TEMP?#"))
+		if (strstr((char *)usart_packet.rx_buf, "TEMP1"))
 		{
-			// 触发事件标志位0x20,触发温度记录任务
-			xEventGroupSetBits(g_event_group, EVENT_GROUP_DHT);
+			vTaskSuspend(app_task_rtc_handle);	 // 挂起实时时钟任务
+			g_rtc_get_what = FLAG_RTC_GET_NONE;	 // 	不显示时间信息
+			if (g_unlock_what == FLAG_UNLOCK_OK) // 设备已经解锁
+			{
+				oled.ctrl = OLED_CTRL_CLEAR;
+				xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+									 &oled,		   /* 发送的消息内容 */
+									 100);		   /* 等待时间 100 Tick */
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_dht] xQueueSend oled string error code is %d\r\n", xReturn);
+				g_dht_get_what = FLAG_DHT_GET_START; // 切换获取温度状态
+			}
+		}
+		// 停止获取当前温湿度
+		if (strstr((char *)usart_packet.rx_buf, "TEMP0"))
+		{
+			vTaskSuspend(app_task_rtc_handle);	 // 挂起实时时钟任务
+			g_rtc_get_what = FLAG_RTC_GET_NONE;	 // 	不显示时间信息
+			if (g_unlock_what == FLAG_UNLOCK_OK) // 设备已经解锁
+			{
+				oled.ctrl = OLED_CTRL_CLEAR;
+				xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+									 &oled,		   /* 发送的消息内容 */
+									 100);		   /* 等待时间 100 Tick */
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_dht] xQueueSend oled string error code is %d\r\n", xReturn);
+				g_dht_get_what = FLAG_DHT_GET_NONE; // 切换获取温度状态
+			}
 		}
 		if (strstr((char *)usart_packet.rx_buf, "ALARM SET")) // 设置闹钟：日-时-分-秒
 		{
@@ -978,6 +987,16 @@ static void app_task_usart(void *pvParameters)
 		if (strstr((char *)usart_packet.rx_buf, "LOG"))
 		{
 			flash_read(20);
+		}
+		if (strstr((char *)usart_packet.rx_buf, "TIME?")) // 显示实时时间
+		{
+			oled.ctrl = OLED_CTRL_CLEAR; /* oled清屏 */
+			xReturn = xQueueSend(g_queue_oled, &oled, 100);
+			if (xReturn != pdPASS)
+				dgb_printf_safe("[app_task_key] xQueueSend oled string error code is %d\r\n", xReturn);
+			vTaskResume(app_task_rtc_handle);	// 恢复rtc任务
+			g_rtc_get_what = FLAG_RTC_GET_TIME; // 获取时间
+												// g_rtc_get_what = FLAG_RTC_GET_DATE; // 获取日期
 		}
 	}
 }
@@ -1303,21 +1322,11 @@ void app_task_fpm383(void *pvParameters)
 					g_pass_man_what = FLAG_PASS_MAN_NONE;	 // 解锁成功关闭键盘解锁蓝牙解锁
 					g_pass_unlock_mode = MODE_OPEN_LOCK_SFM; // 设置为指纹解锁模式
 
-					beep.sta = 1;
-					beep.duration = 50;
-					xReturn = xQueueSend(g_queue_beep, &beep, 100);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_fpm383] xQueueSend beep error code is %d\r\n", xReturn);
-					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
-					xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
-
 					motor = MOTOR_DOUBLE_POS;
 					xReturn = xQueueSend(g_queue_motor, &motor, 100);
 					if (xReturn != pdPASS)
 						dgb_printf_safe("[app_task_fpm383] xQueueSend motor error code is %d\r\n", xReturn);
-					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+					/* [可选]阻塞等待信号量，用于确保任务完成对motor的控制 */
 					xReturn = xSemaphoreTake(g_sem_motor, portMAX_DELAY);
 					if (xReturn != pdPASS)
 						dgb_printf_safe("[app_task_fpm383] xSemaphoreTake g_sem_motor error code is %d\r\n", xReturn);
@@ -1743,6 +1752,7 @@ void app_task_fr1002(void *pvParameters)
 /*步进电机模块*/
 void app_task_motor(void *pvParameters)
 {
+	beep_t beep;
 	uint8_t motor;
 	BaseType_t xReturn;
 	for (;;)
@@ -1756,6 +1766,15 @@ void app_task_motor(void *pvParameters)
 		if (motor == MOTOR_DOUBLE_POS)
 		{
 			motor_corotation_double_pos();
+			beep.sta = 1;
+			beep.duration = 50;
+			xReturn = xQueueSend(g_queue_beep, &beep, 100);
+			if (xReturn != pdPASS)
+				dgb_printf_safe("[app_task_fpm383] xQueueSend beep error code is %d\r\n", xReturn);
+			/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+			xReturn = xSemaphoreTake(g_sem_beep, portMAX_DELAY);
+			if (xReturn != pdPASS)
+				dgb_printf_safe("[app_task_fpm383] xSemaphoreTake g_sem_beep error code is %d\r\n", xReturn);
 		}
 		if (motor == MOTOR_DOUBLE_REV)
 		{
@@ -1831,14 +1850,21 @@ void app_task_monitor(void *pvParameters)
 		}
 	}
 }
+
 /*ESP8266WIFI模块*/
 void app_task_esp8266(void *pvParameters)
 {
-	uint8_t buf[512];
+	uint8_t buf[MAX_DATA_SIZE];
 	uint8_t led_sta = 0;
 	beep_t beep;
+	uint8_t motor;
+	oled_t oled;
+	flash_t flash;
 	BaseType_t xReturn = pdFALSE;
 	uint32_t i;
+	uint32_t j;
+	uint32_t ret = 0;
+	uint8_t jsonString[MAX_DATA_SIZE] = {0};
 
 	dgb_printf_safe("[app_task_esp8266] create success\r\n");
 
@@ -1888,99 +1914,148 @@ void app_task_esp8266(void *pvParameters)
 		xReturn = xQueueReceive(g_queue_esp8266, /* 消息队列的句柄 */
 								buf,			 /* 得到的消息内容 */
 								portMAX_DELAY);	 /* 等待时间一直等 */
+
 		if (xReturn != pdPASS)
 		{
 			dgb_printf_safe("[app_task_esp8266] xQueueReceive error code is %d\r\n", xReturn);
 			continue;
 		}
-
-		for (i = 0; i < sizeof(buf); i++)
+		i = 0;
+		while (buf[i] != '{') // 忽略垃圾数据头
 		{
-			// 判断的关键字符是否为 1"
-			// 核心数据，即{"switch_led_1":1}中的“1”
-			if ((buf[i] == 0x31) && (buf[i + 1] == 0x22))
-			{
-				// 判断控制变量
-				if (buf[i + 3] == '1')
-				{
-					led_sta = LED1_ON;
-					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
-					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
-					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
-				}
-				else
-				{
-					led_sta = LED1_OFF;
-					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
-					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
-					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
-				}
-			}
+			/* code */
+			i++;
+			if (i >= MAX_DATA_SIZE)
+				break;
+		}
+		for (j = 0, i; i < sizeof(buf); i++, j++)
+		{
+			sprintf(&jsonString[j], "%c", buf[i]);
+		}
 
-			// 判断的关键字符是否为 2"
-			// 核心数据，即{"switch_led_2":1}中的“1”
-			if ((buf[i] == 0x32) && (buf[i + 1] == 0x22))
+		jsonString[j] = '\0';
+		// 简单方法解析
+		if (strstr(jsonString, "\"switch_led_1\":0") != NULL)
+		{
+			dgb_printf_safe("[app_task_esp8266] switch_led_1:0\r\n");
+			led_sta = LED1_OFF;
+			xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+			if (xReturn != pdPASS)
+				dgb_printf_safe("[app_task_esp8266] xQueueSend led error code is %d\r\n", xReturn);
+		}
+		if (strstr(jsonString, "\"switch_led_1\":1") != NULL)
+		{
+			dgb_printf_safe("[app_task_esp8266] switch_led_1:1\r\n");
+			led_sta = LED1_ON;
+			xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+			if (xReturn != pdPASS)
+				dgb_printf_safe("[app_task_esp8266] xQueueSend led error code is %d\r\n", xReturn);
+		}
+		if (strstr(jsonString, "\"switch_led_2\":0") != NULL)
+		{
+			dgb_printf_safe("[app_task_esp8266] switch_led_2:0\r\n");
+			led_sta = LED2_OFF;
+			xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+			if (xReturn != pdPASS)
+				dgb_printf_safe("[app_task_esp8266] xQueueSend led error code is %d\r\n", xReturn);
+		}
+		if (strstr(jsonString, "\"switch_led_2\":1") != NULL)
+		{
+			dgb_printf_safe("[app_task_esp8266] switch_led_2:1\r\n");
+			led_sta = LED2_ON;
+			xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+			if (xReturn != pdPASS)
+				dgb_printf_safe("[app_task_esp8266] xQueueSend led error code is %d\r\n", xReturn);
+		}
+		if (strstr(jsonString, "\"switch_led_3\":0") != NULL)
+		{
+			dgb_printf_safe("[app_task_esp8266] switch_led_3:0\r\n");
+			led_sta = LED3_OFF;
+			xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+			if (xReturn != pdPASS)
+				dgb_printf_safe("[app_task_esp8266] xQueueSend led error code is %d\r\n", xReturn);
+		}
+		if (strstr(jsonString, "\"switch_led_3\":1") != NULL)
+		{
+			dgb_printf_safe("[app_task_esp8266] switch_led_3:1\r\n");
+			led_sta = LED3_ON;
+			xReturn = xQueueSend(g_queue_led, &led_sta, 100);
+			if (xReturn != pdPASS)
+				dgb_printf_safe("[app_task_esp8266] xQueueSend led error code is %d\r\n", xReturn);
+		}
+		if (g_unlock_what == FLAG_UNLOCK_OK)
+		{
+			if (strstr(jsonString, "\"lock_1\":0") != NULL)
 			{
-				// 判断控制变量
-				if (buf[i + 3] == '1')
-				{
-					led_sta = LED2_ON;
-					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
-					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
-					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
-				}
-				else
-				{
-					led_sta = LED2_OFF;
-					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
-					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
-					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
-				}
+				dgb_printf_safe("[app_task_esp8266] lock_1:0\r\n");
+				g_pass_man_what = FLAG_PASS_MAN_AUTH; // 开始密码验证
+				g_unlock_what = FLAG_UNLOCK_NO;
+				// 显示密码输入界面
+				oled.ctrl = OLED_CTRL_CLEAR;
+				xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+									 &oled,		   /* 发送的消息内容 */
+									 100);		   /* 等待时间 100 Tick */
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_esp8266] xQueueSend oled string error code is %d\r\n", xReturn);
+				motor = MOTOR_DOUBLE_REV;
+				xReturn = xQueueSend(g_queue_motor, &motor, 100);
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_esp8266] xQueueSend motor error code is %d\r\n", xReturn);
+				/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+				xReturn = xSemaphoreTake(g_sem_motor, portMAX_DELAY);
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_motor error code is %d\r\n", xReturn);
+				/* 显示锁屏界面 */
+				oled.ctrl = OLED_CTRL_SHOW_PICTURE;
+				oled.x = 32;
+				oled.y = 0;
+				oled.pic_width = 64;
+				oled.pic_height = 8;
+				oled.pic = pic_lock_icon;
+				xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+									 &oled,		   /* 发送的消息内容 */
+									 100);		   /* 等待时间 100 Tick */
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_esp8266] xQueueSend oled picture error code is %d\r\n", xReturn);
+				g_pass_unlock_mode = MODE_OPEN_LOCK_KEYBOARD; // 恢复默认解锁模式
 			}
-
-			// 判断的关键字符是否为 3"
-			// 核心数据，即{"switch_led_3":1}中的“1”
-			if (buf[i] == 0x33 && buf[i + 1] == 0x22)
+		}
+		if (g_unlock_what == FLAG_UNLOCK_NO)
+		{
+			if (strstr(jsonString, "\"lock_1\":1") != NULL)
 			{
-				// 判断控制变量
-				if (buf[i + 3] == '1')
-				{
-					led_sta = LED3_ON;
-					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
-					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
-					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
-				}
-				else
-				{
-					led_sta = LED3_OFF;
-					xReturn = xQueueSend(g_queue_led, &led_sta, 100);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xQueueSend led string error code is %d\r\n", xReturn);
-					/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
-					xReturn = xSemaphoreTake(g_sem_led, portMAX_DELAY);
-					if (xReturn != pdPASS)
-						dgb_printf_safe("[app_task_esp8266] xSemaphoreTake g_sem_led error code is %d\r\n", xReturn);
-				}
+				dgb_printf_safe("[app_task_esp8266] lock_1:1\r\n");
+				g_unlock_what = FLAG_UNLOCK_OK;			  // 设备解锁
+				g_pass_man_what = FLAG_PASS_MAN_NONE;	  // 解锁成功关闭键盘解锁蓝牙解锁，关闭密码验证
+				g_pass_unlock_mode = MODE_OPEN_LOCK_MQTT; // 设置为MQTT远程解锁模式
+
+				motor = MOTOR_DOUBLE_POS;
+				xReturn = xQueueSend(g_queue_motor, &motor, 100);
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_fpm383] xQueueSend motor error code is %d\r\n", xReturn);
+				/* [可选]阻塞等待信号量，用于确保任务完成对beep的控制 */
+				xReturn = xSemaphoreTake(g_sem_motor, portMAX_DELAY);
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_fpm383] xSemaphoreTake g_sem_motor error code is %d\r\n", xReturn);
+
+				/* 设置要显示的图片-表情（成功） */
+				oled.x = 32;
+				oled.y = 0;
+				oled.pic_width = 64;
+				oled.pic_height = 8;
+				oled.ctrl = OLED_CTRL_SHOW_PICTURE;
+				oled.pic = pic_unlock_icon;
+
+				xReturn = xQueueSend(g_queue_oled, /* 消息队列的句柄 */
+									 &oled,		   /* 发送的消息内容 */
+									 100);		   /* 等待时间 100 Tick */
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_fpm383] xQueueSend oled picture error code is %d\r\n", xReturn);
+				//  发送flash消息记录解锁日志
+				flash.mode = g_pass_unlock_mode; // 获取当前解锁模式，存入flash
+				xReturn = xQueueSend(g_queue_flash, &flash, 100);
+				if (xReturn != pdPASS)
+					dgb_printf_safe("[app_task_fpm383] xQueueSend flash error code is %d\r\n", xReturn);
 			}
 		}
 	}

@@ -7,13 +7,22 @@
 
 //此处是阿里云服务器的公共实例登陆配置-------------------------------------注意修改为自己的云服务设备信息！！！！
 
+// /*smartdevice的参数配置*/
+// #define MQTT_BROKERADDRESS 		"k0k7mAaroaa.iot-as-mqtt.cn-shanghai.aliyuncs.com"
+// #define MQTT_CLIENTID 			"0001|securemode=3,signmethod=hmacsha1|"
+// #define MQTT_USARNAME 			"smartdevice&k0k7mAaroaa"
+// #define MQTT_PASSWD 			"D1017DC160B5680387DF7CAA884A5DCB7DF1FF7F"
+// #define	MQTT_PUBLISH_TOPIC 		"/sys/k0k7mAaroaa/smartdevice/thing/event/property/post"
+// #define MQTT_SUBSCRIBE_TOPIC 	"/sys/k0k7mAaroaa/smartdevice/thing/service/property/set"
 
-#define MQTT_BROKERADDRESS 		"k0k7mAaroaa.iot-as-mqtt.cn-shanghai.aliyuncs.com"
-#define MQTT_CLIENTID 			"0001|securemode=3,signmethod=hmacsha1|"
-#define MQTT_USARNAME 			"smartdevice&k0k7mAaroaa"
-#define MQTT_PASSWD 			"D1017DC160B5680387DF7CAA884A5DCB7DF1FF7F"
-#define	MQTT_PUBLISH_TOPIC 		"/sys/k0k7mAaroaa/smartdevice/thing/event/property/post"
-#define MQTT_SUBSCRIBE_TOPIC 	"/sys/k0k7mAaroaa/smartdevice/thing/service/property/set"
+
+/*smartlock的参数配置*/
+#define MQTT_BROKERADDRESS 		"k0k7meHPb18.iot-as-mqtt.cn-shanghai.aliyuncs.com"
+#define MQTT_CLIENTID 			"0002|securemode=3,signmethod=hmacsha1|"
+#define MQTT_USARNAME 			"smartlock&k0k7meHPb18"
+#define MQTT_PASSWD 			"BC663D7147073DA47DBC42F873890484BBFF0921"
+#define	MQTT_PUBLISH_TOPIC 		"/sys/k0k7meHPb18/smartlock/thing/event/property/post"
+#define MQTT_SUBSCRIBE_TOPIC 	"/sys/k0k7meHPb18/smartlock/thing/service/property/set"
 
 
 //此处是阿里云服务器的企业实例登陆配置-------------------------------------注意修改为自己的云服务设备信息！！！！

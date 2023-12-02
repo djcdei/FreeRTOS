@@ -270,23 +270,26 @@ void mqtt_report_devices_status(void)
     uint8_t led_1_sta = GPIO_ReadOutputDataBit(GPIOF, GPIO_Pin_9) ? 0 : 1;
     uint8_t led_2_sta = GPIO_ReadOutputDataBit(GPIOF, GPIO_Pin_10) ? 0 : 1;
     uint8_t led_3_sta = GPIO_ReadOutputDataBit(GPIOE, GPIO_Pin_13) ? 0 : 1;
+    uint32_t lock_sta = g_unlock_what;//设备解锁状态
 
     // 把开发板相关的状态变量利用sprintf函数存放到一个数组里，再把该数组利用MQTT协议打包成消息报文
     // sprintf(str,"a=%d",a);
     // 需要更改“temperature”和“CurrentHumidity”为对应的平台设备信息；
     sprintf(g_mqtt_msg,
-            "{\"method\":\"thing.service.property.set\",\"id\":\"0001\",\"params\":{\
+            "{\"method\":\"thing.service.property.set\",\"id\":\"0002\",\"params\":{\
 		\"temperature\":%.1f,\
 		\"Humidity\":%.1f,\
 		\"switch_led_1\":%d,\
 		\"switch_led_2\":%d,\
 		\"switch_led_3\":%d,\
+        \"lock_1\":%d,\
 	},\"version\":\"1.0.0\"}",
             g_temp,
             g_humi,
             led_1_sta,
             led_2_sta,
-            led_3_sta);
+            led_3_sta,
+            lock_sta);
 
     // 上报信息到平台服务器
     mqtt_publish_data(MQTT_PUBLISH_TOPIC, g_mqtt_msg, 0);

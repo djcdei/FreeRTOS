@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40_41xxx,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\HARDWARE\LED;..\FREERTOS\include;..\FREERTOS\port;..\HARDWARE\DHT11;..\HARDWARE\SR04;..\HARDWARE\BEEP;..\HARDWARE\FLASH;..\HARDWARE\KEY;..\HARDWARE\RTC;..\HARDWARE\OLED;..\HARDWARE\MFRC522;..\HARDWARE\KEYBOARD;..\HARDWARE\AT24C02;..\HARDWARE\FPM383;..\HARDWARE\FR1002;..\HARDWARE\MOTOR;..\HARDWARE\ESP8266</IncludePath>
+              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\HARDWARE\LED;..\FREERTOS\include;..\FREERTOS\port;..\HARDWARE\DHT11;..\HARDWARE\SR04;..\HARDWARE\BEEP;..\HARDWARE\FLASH;..\HARDWARE\KEY;..\HARDWARE\RTC;..\HARDWARE\OLED;..\HARDWARE\MFRC522;..\HARDWARE\KEYBOARD;..\HARDWARE\AT24C02;..\HARDWARE\FPM383;..\HARDWARE\FR1002;..\HARDWARE\MOTOR;..\HARDWARE\ESP8266;..\HARDWARE\CJSON</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -512,6 +512,11 @@
               <FileName>esp8266.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\ESP8266\esp8266.c</FilePath>
+            </File>
+            <File>
+              <FileName>cJSON.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\CJSON\cJSON.c</FilePath>
             </File>
           </Files>
         </Group>
