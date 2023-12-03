@@ -29,28 +29,22 @@
 #include "fpm383.h"
 #include "fr1002.h"
 #include "motor.h"
-// #include "mpu6050.h"
-// #include "inv_mpu.h"
-// #include "inv_mpu_dmp_motion_driver.h"
-// #include "dmpKey.h"
-// #include "dmpmap.h"
 #include "rtc.h"
-// #include "iwdg.h"
+#include "iwdg.h"
 #include "beep.h"
 #include "oled.h"
 #include "oledfont.h"
 #include "bmp.h"
+// #include "cJSON.h"
 
-//#include "cJSON.h"
+// /*RFID射频卡状态宏定义*/
+// #define STA_CARD_REQUEST 0 // RFID请求
+// #define STA_CARD_FOUND 1
+// #define STA_CARD_VALID_FOUND 2
+// #define STA_CARD_INVALID_FOUND 3
+// #define STA_CARD_VALID_ADD 4
 
-/*RFID射频卡状态宏定义*/
-#define STA_CARD_REQUEST 0 // RFID请求
-#define STA_CARD_FOUND 1
-#define STA_CARD_VALID_FOUND 2
-#define STA_CARD_INVALID_FOUND 3
-#define STA_CARD_VALID_ADD 4
-
-#define MAX_CARDS 100 // 射频卡注册最大数量
+// #define MAX_CARDS 100 // 射频卡注册最大数量
 
 /* 按键相关的事件标志宏定义 */
 #define EVENT_GROUP_KEY1_DOWN 0x01
@@ -84,7 +78,7 @@
 #define EVENT_GROUP_FACE_AUTH 0X100000	// 验证人脸
 #define EVENT_GROUP_FACE_SHOW 0X200000	// 显示当前人脸个数
 #define EVENT_GROUP_FACE_OK 0x400000	// 人脸识别完成标志
-#define EVENT_GROUP_FACE_AGAIN 0x800000	//人脸识别失败，再次识别
+#define EVENT_GROUP_FACE_AGAIN 0x800000 // 人脸识别失败，再次识别
 
 /*队列长度宏定义*/
 #define QUEUE_USART_LEN 4 /* 队列的长度，最大可包含多少个消息 */
@@ -93,8 +87,8 @@
 #define QUEUE_OLED_LEN 16 /* 队列的长度，最大可包含多少个消息 */
 #define QUEUE_FLASH_LEN 16
 #define QUEUE_KEYBOARD_LEN 4 /*矩阵键盘队列长度*/
-#define QUEUE_FSM_LEN 16 
-#define QUEUE_MOTOR_LEN 1 
+#define QUEUE_FSM_LEN 16
+#define QUEUE_MOTOR_LEN 1
 #define QUEUE_ESP8266_LEN 3
 
 /*rtc标志位*/
@@ -116,6 +110,9 @@
 #define PASS_LEN 6			   // 密码长度
 #define XOR_KEY 0X88		   // 解密密钥
 
+/*系统无操作熄屏最大时间*/
+#define SCREEN_OFF_TIME 20
+
 /* 变量 */
 /*互斥信号量句柄*/
 extern SemaphoreHandle_t g_mutex_printf;
@@ -126,6 +123,8 @@ extern void dgb_printf_safe(const char *format, ...);
 extern float g_temp;
 extern float g_humi;
 extern volatile uint32_t g_unlock_what;
+extern volatile uint32_t g_system_no_opreation_cnt;
+extern volatile uint32_t g_oled_display_flag;
 
 /*事件标志组*/
 extern EventGroupHandle_t g_event_group;
@@ -133,13 +132,13 @@ extern EventGroupHandle_t g_event_group;
 /*串口队列句柄*/
 extern QueueHandle_t g_queue_usart;
 /* 人脸队列句柄 */
-extern QueueHandle_t 	g_queue_frm;
+extern QueueHandle_t g_queue_frm;
 
 /* wifi队列句柄 */
-extern QueueHandle_t 	g_queue_esp8266;
+extern QueueHandle_t g_queue_esp8266;
 
 /* 相关硬件消息类型结构设计 */
-extern volatile uint32_t g_ISR_dbg;//判断中断服务函数是否被触发的调试标志位
+extern volatile uint32_t g_ISR_dbg; // 判断中断服务函数是否被触发的调试标志位
 
 /*oled消息结构*/
 typedef struct __oled_t

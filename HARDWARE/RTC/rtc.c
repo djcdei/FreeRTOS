@@ -51,7 +51,7 @@ void rtc_init(void)
 	RTC_Init(&RTC_InitStructure);
 
 	// 配置日期
-	RTC_DateStructure.RTC_Year = 0x23;					   // 2021年
+	RTC_DateStructure.RTC_Year = 0x23;					   // 2023年
 	RTC_DateStructure.RTC_Month = RTC_Month_November;	   // 11月份
 	RTC_DateStructure.RTC_Date = 0x28;					   // 第28天/28日/28号
 	RTC_DateStructure.RTC_WeekDay = RTC_Weekday_Tuesday; // 星期2

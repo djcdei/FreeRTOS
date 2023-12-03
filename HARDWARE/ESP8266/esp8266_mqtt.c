@@ -307,17 +307,17 @@ int32_t esp8266_mqtt_init(void)
 
     if (rt)
     {
-        printf("esp8266_exit_transparent_transmission fail\r\n");
+        dgb_printf_safe("esp8266_exit_transparent_transmission fail\r\n");
         return -1;
     }
-    printf("esp8266_exit_transparent_transmission success\r\n");
+    dgb_printf_safe("esp8266_exit_transparent_transmission success\r\n");
     delay_ms(2000);
 
     // 复位模块
     rt = esp8266_reset();
     if (rt)
     {
-        printf("esp8266_reset fail\r\n");
+        dgb_printf_safe("esp8266_reset fail\r\n");
         return -2;
     }
     delay_ms(2000);
@@ -326,56 +326,56 @@ int32_t esp8266_mqtt_init(void)
     rt = esp8266_enable_echo(0);
     if (rt)
     {
-        printf("esp8266_enable_echo(0) fail\r\n");
+        dgb_printf_safe("esp8266_enable_echo(0) fail\r\n");
         return -3;
     }
-    printf("esp8266_enable_echo(0)success\r\n");
+    dgb_printf_safe("esp8266_enable_echo(0)success\r\n");
     delay_ms(2000);
 
     // 连接热点
     rt = esp8266_connect_ap(WIFI_SSID, WIFI_PASSWORD);
     if (rt)
     {
-        printf("esp8266_connect_ap fail\r\n");
+        dgb_printf_safe("esp8266_connect_ap fail\r\n");
         return -4;
     }
-    printf("esp8266_connect_ap success\r\n");
+    dgb_printf_safe("esp8266_connect_ap success\r\n");
     delay_ms(2000);
 
     rt = esp8266_connect_server("TCP", MQTT_BROKERADDRESS, 1883);
     if (rt)
     {
-        printf("esp8266_connect_server fail\r\n");
+        dgb_printf_safe("esp8266_connect_server fail\r\n");
         return -5;
     }
-    printf("esp8266_connect_server success\r\n");
+    dgb_printf_safe("esp8266_connect_server success\r\n");
     delay_ms(2000);
 
     // 进入透传模式
     rt = esp8266_entry_transparent_transmission();
     if (rt)
     {
-        printf("esp8266_entry_transparent_transmission fail\r\n");
+        dgb_printf_safe("esp8266_entry_transparent_transmission fail\r\n");
         return -6;
     }
-    printf("esp8266_entry_transparent_transmission success\r\n");
+    dgb_printf_safe("esp8266_entry_transparent_transmission success\r\n");
     delay_ms(2000);
 
     if (mqtt_connect(MQTT_CLIENTID, MQTT_USARNAME, MQTT_PASSWD))
     {
-        printf("mqtt_connect fail\r\n");
+        dgb_printf_safe("mqtt_connect fail\r\n");
         return -7;
     }
-    printf("mqtt_connect success\r\n");
+    dgb_printf_safe("mqtt_connect success\r\n");
     delay_ms(2000);
 
     if (mqtt_subscribe_topic(MQTT_SUBSCRIBE_TOPIC, 0, 1))
     {
-        printf("mqtt_subscribe_topic fail\r\n");
+        dgb_printf_safe("mqtt_subscribe_topic fail\r\n");
         return -8;
     }
 
-    printf("mqtt_subscribe_topic success\r\n");
+    dgb_printf_safe("mqtt_subscribe_topic success\r\n");
 
     return 0;
 }
